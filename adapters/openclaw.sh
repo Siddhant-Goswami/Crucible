@@ -30,7 +30,13 @@ FB=""
 $(cat "$FEEDBACK")"
 
 # OpenClaw's write/edit tools target the configured workspace — aim it at the sandbox.
-openclaw config set agents.defaults.workspace "$WORK" >/dev/null 2>&1 || true
+# This MUST succeed: a failed write would silently leave the previous workspace in
+# place, so `openclaw agent` could edit another run's sandbox (or the user's own
+# project) instead of $WORK. Fail closed rather than write to the wrong place.
+if ! openclaw config set agents.defaults.workspace "$WORK" >/dev/null 2>&1; then
+  echo "openclaw: failed to point workspace at $WORK — aborting (won't risk another workspace)" >&2
+  exit 1
+fi
 
 # Embedded one-shot agent; a fresh per-iteration session keeps attempts independent.
 openclaw agent --local --model "$MODEL" \

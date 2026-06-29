@@ -18,11 +18,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 echo "== benchmark: running the battery through every available harness =="
-./compare.sh "$@"
+./compare.sh "$@" || { echo "compare.sh failed — not building a report from a partial/stale run" >&2; exit 1; }
 
 echo
 echo "== building results/BENCHMARK.md =="
-node benchmark.js
+node benchmark.js || { echo "benchmark.js failed — results/BENCHMARK.md may be stale" >&2; exit 1; }
 
 echo
 echo "================= results/BENCHMARK.md ================="

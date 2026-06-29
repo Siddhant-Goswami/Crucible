@@ -60,6 +60,11 @@ cost_of() {  # <adapter> <tok_in> <tok_out> -> "$0" or "$0.0123"
 
 # --- run + tabulate (write incrementally; progress to stderr) -----------------
 : > "$OUT"
+# Manifest of exactly the (task.adapter) runs THIS battery executes, so benchmark.js
+# scores only this run and doesn't leak stale results from previous/other batteries.
+mkdir -p .runs
+MANIFEST=".runs/.manifest"
+: > "$MANIFEST"
 {
   echo "# Harness comparison"
   echo
@@ -86,8 +91,19 @@ for task in "${TASKS[@]}"; do
     if [ -f "$rj" ]; then
       read -r res iters wall tin tout <<<"$(jq -r '[.result,.iterations,.wall_ms,.tokens_in,.tokens_out]|@tsv' "$rj")"
     else
-      res="no-result"; iters="-"; wall="-"; tin=0; tout=0
+      # loop.sh produced no result.json (setup error / crash). Persist a no-result
+      # row so benchmark.js still counts this (task,adapter) instead of silently
+      # shrinking the denominator and inflating completion.
+      res="no-result"; iters="-"; wall=0; tin=0; tout=0
+      mkdir -p ".runs/$name.$a"
+      ts="$(node -e 'process.stdout.write(new Date().toISOString())' 2>/dev/null || echo '')"
+      cat > "$rj" <<JSON
+{ "ts": "$ts", "node": "${NODE:-local}", "task": "$name", "adapter": "$a",
+  "result": "no-result", "iterations": 0, "max_iters": $MAX_ITERS,
+  "wall_ms": 0, "act_ms_total": 0, "tokens_in": 0, "tokens_out": 0 }
+JSON
     fi
+    echo "$name.$a" >> "$MANIFEST"
     case "$a" in claude) off="❌";; *) off="✅";; esac
     cost="$(cost_of "$a" "$tin" "$tout")"
     printf "| %s | %s | %s | %s ms | %s/%s | %s | %s |\n" \

@@ -19,7 +19,7 @@ precedent. The gate refuses to "ship" a calibration that drops any correction.
 for EACH open correction one bullet that names the `submission_id`, states
 `machine_overall → human_overall`, and **copies the `lesson` text verbatim**:
 
-```
+```text
 <!-- BEGIN AUTO-CALIBRATION -->
 When grading, treat these past corrections as binding precedent:
 
@@ -37,7 +37,7 @@ Read the real verdicts and lessons from `decisions.jsonl`; copy each lesson exac
 
 Emit ONLY the file block — no prose, no markdown fences:
 
-```
+```text
 ===FILE: calibration.md===
 <!-- BEGIN AUTO-CALIBRATION -->
 …one bullet per open correction, lesson copied verbatim…

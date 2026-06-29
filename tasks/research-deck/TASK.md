@@ -32,7 +32,7 @@ Title/summary slides use `"topic": null` and need no claims (but still need note
 
 Emit ONLY the file block — no prose, no markdown fences:
 
-```
+```text
 ===FILE: deck.json===
 { …the deck… }
 ===END===

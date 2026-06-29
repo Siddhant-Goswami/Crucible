@@ -19,10 +19,20 @@ const ORDER = ['mock', 'ollama', 'pi', 'hermes', 'openclaw', 'goose', 'claude'];
 const ord = a => { const i = ORDER.indexOf(a); return i < 0 ? 99 : i; };
 
 // --- gather result.json files -------------------------------------------------
+// Scope to THIS battery: compare.sh writes .runs/.manifest listing exactly the
+// (task.adapter) runs it executed, so we don't fold stale results from previous or
+// other-subset batteries into the report. If no manifest exists (e.g. benchmark.js
+// run standalone), fall back to scanning every result.json for backward compat.
 const runsDir = path.join(ROOT, '.runs');
+let scope = null;
+const manifest = path.join(runsDir, '.manifest');
+if (fs.existsSync(manifest)) {
+  scope = new Set(fs.readFileSync(manifest, 'utf8').split('\n').map(s => s.trim()).filter(Boolean));
+}
 const runs = [];
 if (fs.existsSync(runsDir)) {
   for (const d of fs.readdirSync(runsDir)) {
+    if (scope && !scope.has(d)) continue;     // ignore runs outside this battery
     const rj = path.join(runsDir, d, 'result.json');
     if (fs.existsSync(rj)) { try { runs.push(JSON.parse(fs.readFileSync(rj, 'utf8'))); } catch (e) {} }
   }
@@ -43,13 +53,16 @@ const score = {};
 for (const a of adapters) {
   const rs = runs.filter(r => r.adapter === a);
   const passed = rs.filter(r => r.result === 'passed');
+  // no-result rows count against completion (denominator) but did not actually
+  // run, so they're excluded from the latency average to avoid skewing it toward 0.
+  const ran = rs.filter(r => r.result !== 'no-result');
   const avgItersPass = passed.length ? passed.reduce((s, r) => s + r.iterations, 0) / passed.length : null;
   score[a] = {
     n: rs.length,
     passed: passed.length,
     completion: rs.length ? Math.round(100 * passed.length / rs.length) : 0,
     recovery: avgItersPass,                                   // avg iterations among passes
-    latency: rs.reduce((s, r) => s + (r.wall_ms || 0), 0) / rs.length,
+    latency: ran.length ? ran.reduce((s, r) => s + (r.wall_ms || 0), 0) / ran.length : 0,
     tokIn: rs.reduce((s, r) => s + (r.tokens_in || 0), 0),
     tokOut: rs.reduce((s, r) => s + (r.tokens_out || 0), 0),
     cost: rs.reduce((s, r) => s + priceRun(r), 0),
@@ -112,10 +125,11 @@ md.push('## 3. Per-task results  (✅ = passed in N iters, ❌ = failed within m
 md.push('');
 md.push('| Task | ' + adapters.join(' | ') + ' |');
 md.push('|------|' + adapters.map(() => '---').join('|') + '|');
+const didNotComplete = r => !r || r.result === 'no-result';   // shown as `·`
 for (const t of tasks) {
   const cells = adapters.map(a => {
     const r = runs.find(x => x.task === t && x.adapter === a);
-    if (!r) return '·';
+    if (didNotComplete(r)) return '·';
     return r.result === 'passed' ? `✅ ${r.iterations}` : '❌';
   });
   md.push(`| \`${t}\` | ` + cells.join(' | ') + ' |');
@@ -130,16 +144,40 @@ md.push('- **Tokens are only captured where the adapter reports them** (`ollama`
 md.push('- **Recovery = how many verify→fix iterations a harness needed to pass** (1 = first try). It\'s the loop\'s self-correction signal, bounded by `max_iters`; a `❌` means it never passed within that budget — an honest "the harness+model couldn\'t do it here", not a crash.');
 md.push('- **Cost is marginal/measured.** Local harnesses are $0 (your electricity); `claude` is priced from real token usage (cache counted at full rate — an upper bound). See `node cost.js`.');
 md.push('- Latency includes harness startup + (for local) model load; first-touch runs pay a one-time model load.');
-md.push('- **Coverage is reported, not faked.** A `·` is a cell that did not complete — notably `goose` on `research-deck`: the heaviest harness on the heaviest task did not finish a deck within the run-time limits on local `qwen3:8b`. That runtime *is* the finding, so it stays `·` rather than being quietly dropped.');
-md.push('- Runs were collected at `max_iters` 2–3; nearly all passes land by iter 2, so this does not move the ranking.');
+// coverage caveat — derived from the actual runs, not hardcoded. A scheduled run
+// that produced no verdict is a `no-result` row: it IS counted against completion
+// (the honesty point), unlike a `·` for a harness that simply doesn't apply.
+const noResultCells = runs.filter(r => r.result === 'no-result').map(r => '`' + r.adapter + '`/`' + r.task + '`');
+if (noResultCells.length) {
+  md.push('- **No-result runs are counted, not dropped.** These scheduled runs produced no verdict yet still count against completion (not silently removed from the denominator): ' + noResultCells.join(', ') + '.');
+}
+md.push('- A `·` cell means no completed run — either the harness does not apply to that task (e.g. `mock` is the `hello-sum`-only baseline) or it produced no result; a `❌` is a scheduled run that did not pass within `max_iters`.');
+// max_iters note — derived from the runs, so it can't contradict the run config
+const misVals = [...new Set(runs.map(r => r.max_iters).filter(x => x != null))].sort((x, y) => x - y);
+const misLabel = misVals.length ? (misVals.length === 1 ? String(misVals[0]) : misVals[0] + '–' + misVals[misVals.length - 1]) : 'the configured budget';
+md.push('- Runs were collected at `max_iters` ' + misLabel + '; a `❌` means the harness never passed within that budget (an honest miss, not a crash).');
 md.push('');
+
+// --- headline: derived from the scorecard so prose can never contradict it -----
 md.push('## 5. Headline');
 md.push('');
-md.push('For these bounded, **rules-verifiable** tasks the harness — not the model — explains every difference:');
+md.push('For these bounded, **rules-verifiable** tasks the harness — not the model — explains the differences. From this battery:');
 md.push('');
-md.push('- The **thinnest harness on a $0 local model (`ollama`) matched the frontier cloud harness (`claude`)** on completion (6/6, first try) — at zero marginal cost and the lowest local latency. On verifiable work, a heavy harness buys little the gate can see.');
-md.push('- **Pi** (minimalist, 4 tools) completed everything but needed more verify→fix loops (recovery 1.5); **Hermes** missed only the artifact task; **Goose** passes when it finishes but is the slowest by far; **OpenClaw** — a chat gateway, not a coding harness — was weakest (2/6), exactly where the contract\'s edge should show.');
-md.push('- `claude` is fastest-with-perfect-completion, but it is the only non-offline, non-$0 row.');
+const pool = (adapters.filter(a => a !== 'mock')).length ? adapters.filter(a => a !== 'mock') : adapters;
+const byBest = [...pool].sort((a, b) => score[b].completion - score[a].completion || score[a].latency - score[b].latency);
+const best = byBest[0], worst = byBest[byBest.length - 1];
+const fullOffline = pool.filter(a => (profiles[a] || {}).offline && score[a].completion === 100);
+const fastestFull = pool.filter(a => score[a].completion === 100).sort((a, b) => score[a].latency - score[b].latency)[0];
+const slowest = [...pool].sort((a, b) => score[b].latency - score[a].latency)[0];
+const claudeIn = pool.includes('claude');
+const desc = a => '`' + a + '` ' + score[a].passed + '/' + score[a].n + ' (' + score[a].completion + '%)';
+md.push('- **Top completion:** ' + desc(best) + ' at ' + sec(score[best].latency) + ' avg' + (score[best].cost ? ', ' + money(score[best].cost) : ', $0') + '.');
+if (fullOffline.length) {
+  md.push('- **Offline & $0:** ' + fullOffline.map(a => '`' + a + '`').join(', ') + ' reached 100% completion at $0 marginal cost' + (claudeIn ? ' — matching the cloud reference `claude` (' + score['claude'].completion + '%), the only non-offline, non-$0 row' : '') + '.');
+}
+if (fastestFull) md.push('- **Fastest at full completion:** `' + fastestFull + '` (' + sec(score[fastestFull].latency) + ' avg wall).');
+if (score[worst].completion < score[best].completion) md.push('- **Weakest:** ' + desc(worst) + ' had the lowest completion this battery.');
+md.push('- **Slowest:** `' + slowest + '` (' + sec(score[slowest].latency) + ' avg wall).');
 md.push('');
 md.push('_Re-run: `RUN_CLAUDE=1 ./benchmark.sh` (whole battery) — or `node cost.js` for the priced ledger, `results/comparison.md` for the raw run matrix._');
 

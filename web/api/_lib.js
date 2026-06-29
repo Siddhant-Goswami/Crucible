@@ -19,9 +19,14 @@ const PRICING = {
     'claude-haiku-4-5': { in: 1.0, out: 5.0 },
     'claude-fable-5': { in: 10.0, out: 50.0 }
   },
+  // Keep in sync with pricing.json `adapterModel`: every lean harness
+  // (hermes/openclaw/pi/goose) is wired to the SAME local Ollama qwen3:8b as the
+  // `ollama` adapter, so they price to $0 — only `claude` runs a cloud model.
   adapterModel: {
     mock: 'ollama/qwen3:8b', ollama: 'ollama/qwen3:8b',
-    hermes: 'claude-haiku-4-5', claude: 'claude-opus-4-8', nemo: 'ollama/qwen3:8b'
+    hermes: 'ollama/qwen3:8b', openclaw: 'ollama/qwen3:8b',
+    pi: 'ollama/qwen3:8b', goose: 'ollama/qwen3:8b',
+    claude: 'claude-opus-4-8', nemo: 'ollama/qwen3:8b'
   }
 };
 

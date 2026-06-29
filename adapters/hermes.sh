@@ -31,7 +31,7 @@ FB=""
 [ -s "$FEEDBACK" ] && FB="The previous attempt FAILED the verifier. Feedback:
 $(cat "$FEEDBACK")"
 
-cd "$WORK"
+cd "$WORK" || { echo "hermes: cannot enter workdir $WORK" >&2; exit 1; }
 # -z is Hermes' headless one-shot entrypoint (no banner/spinner; final text only).
 hermes -z "You are an automated coding agent working in the current directory.
 Make this project's rules-based verifier (./verify.sh) pass.

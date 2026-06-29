@@ -54,6 +54,28 @@ chmod +x "$WORK/verify.sh" 2>/dev/null || true
 FEEDBACK="$WORK/.feedback"
 : > "$FEEDBACK"
 
+# --- integrity guard: enforce the protected-file contract OUTSIDE the prompt ----
+# Every adapter's prompt asks the agent not to touch the gate, the goal, or the
+# tests — but a prompt is advisory, so a harness could be marked "passed" by simply
+# rewriting verify.sh/TASK.md/*.test.js. Before each verify we RESTORE those files
+# from the pristine task, so no harness can pass without actually solving the task.
+# Lives once here (review's recommendation) rather than duplicated per adapter.
+restore_protected() {
+  local rel
+  while IFS= read -r rel; do
+    rel="${rel#./}"
+    [ -z "$rel" ] && continue
+    if [ -f "$WORK/$rel" ] && ! cmp -s "$TASK_DIR/$rel" "$WORK/$rel"; then
+      echo "  [iter $iter] integrity: restored protected file '$rel' (adapter modified it)" >&2
+    fi
+    mkdir -p "$WORK/$(dirname "$rel")"
+    cp "$TASK_DIR/$rel" "$WORK/$rel"
+  done < <(cd "$TASK_DIR" && find . -type f \
+    \( -name 'verify.sh' -o -name 'TASK.md' -o -name '*.test.js' \
+       -o -name '*_test.js' -o -name '*-test.js' -o -name 'test.js' \) | sort)
+  chmod +x "$WORK/verify.sh" 2>/dev/null || true
+}
+
 # portable millisecond clock (works without GNU date)
 now_ms() { node -e 'process.stdout.write(String(Date.now()))'; }
 
@@ -71,6 +93,9 @@ for ((iter=1; iter<=MAX_ITERS; iter++)); do
   fi
   a1="$(now_ms)"
   act_ms=$(( a1 - a0 )); act_ms_total=$(( act_ms_total + act_ms ))
+
+  # restore the gate/goal/tests from the pristine task before trusting the gate
+  restore_protected
 
   # ---- VERIFY: the rules-based gate decides done / keep-going ---------------
   if fb="$(cd "$WORK" && ./verify.sh 2>&1)"; then

@@ -49,8 +49,8 @@ done < <(cd "$WORK" && find . -type f \
   -not -name '.*' -not -name 'verify.sh' -not -name 'TASK.md' -not -name 'result.json' \
   | sed 's|^\./||' | sort)
 
-PROMPT="You are an automated coding agent. Fix the SOURCE files so the project's
-test suite passes.
+PROMPT="You are an automated coding agent. Edit/create the SOURCE or artifact files
+so the project's rules-based verifier (./verify.sh) passes.
 
 OUTPUT FORMAT — for EACH file you want to change, emit a block EXACTLY like:
 ===FILE: relative/path.js===
@@ -67,7 +67,7 @@ $CTX"
 if [ -n "$FB" ]; then
   PROMPT="$PROMPT
 
-The previous attempt FAILED the test suite. Verifier said:
+The previous attempt FAILED the verifier. It said:
 $FB
 Return the corrected file(s)."
 fi
@@ -103,6 +103,11 @@ printf '%s' "$TEXT" | node -e '
         .replace(/\r?\n[ \t]*```[ \t]*$/, "");             // and a trailing one
       if (rel.startsWith("/") || rel.split("/").includes("..")) {
         console.error("  (ollama: skip unsafe path " + rel + ")"); continue;
+      }
+      // refuse hidden/harness metadata (.tokens, .feedback, .git, …) — loop.sh
+      // trusts .tokens for cost/token reporting, so the model must not write it.
+      if (rel.split("/").some(seg => seg.startsWith("."))) {
+        console.error("  (ollama: refusing to write hidden/harness file " + rel + ")"); continue;
       }
       if (forbid.test(rel)) {
         console.error("  (ollama: refusing to write protected file " + rel + ")"); continue;

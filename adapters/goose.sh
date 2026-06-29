@@ -28,7 +28,7 @@ FB=""
 [ -s "$FEEDBACK" ] && FB="The previous attempt FAILED the verifier. Feedback:
 $(cat "$FEEDBACK")"
 
-cd "$WORK"
+cd "$WORK" || { echo "goose: cannot enter workdir $WORK" >&2; exit 1; }
 goose run --no-session -q -t "You are an automated coding agent working in the current directory.
 Make this project's rules-based verifier (./verify.sh) pass.
 
