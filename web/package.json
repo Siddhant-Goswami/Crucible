@@ -1,0 +1,7 @@
+{
+  "name": "hermes-control-panel-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Vercel-hosted control plane for the hermes-control-panel agent fleet",
+  "engines": { "node": "24.x" }
+}

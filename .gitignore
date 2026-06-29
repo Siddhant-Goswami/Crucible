@@ -15,3 +15,6 @@ loops/01-grading-loop/review-queue/
 
 # os cruft
 .DS_Store
+
+# vercel CLI project link
+.vercel

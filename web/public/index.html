@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>hermes-control-panel</title>
+<style>
+ body{background:#0d1117;color:#c9d1d9;font:14px/1.5 ui-monospace,Menlo,monospace;margin:0;padding:24px;max-width:1100px;margin:auto}
+ h1{font-size:18px;color:#58a6ff;margin:0 0 4px} .sub{color:#8b949e;margin-bottom:16px}
+ .banner{background:#1c2433;border:1px solid #30475e;border-radius:8px;padding:10px 12px;margin-bottom:18px;font-size:13px}
+ .banner b{color:#d29922}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+ .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px}
+ .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}.ok{background:#3fb950}.bad{background:#f85149}
+ .muted{color:#8b949e;font-size:12px} h2{font-size:14px;color:#58a6ff;margin:20px 0 8px}
+ select,button,input{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:7px 10px;font:inherit}
+ button{background:#238636;border-color:#2ea043;cursor:pointer;font-weight:600}button:hover{background:#2ea043}
+ table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:5px 8px;border-bottom:1px solid #21262d}
+ th{color:#8b949e;font-weight:600}.pass{color:#3fb950}.fail{color:#f85149}.big{font-size:22px;color:#e6edf3}
+ form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px}
+</style></head><body>
+<h1>🦞 hermes-control-panel</h1>
+<div class=sub>Serverless control plane — manage loop-driven agent instances across remote nodes.</div>
+<div id=banner class=banner style=display:none></div>
+
+<h2>Nodes</h2><div id=nodes class=grid></div>
+
+<h2>Launch a loop</h2>
+<form id=launch>
+ <label>node <select id=node></select></label>
+ <label>task <select id=task></select></label>
+ <label>adapter <select id=adapter></select></label>
+ <button type=submit>▶ Run</button>
+ <span id=launchmsg class=muted></span>
+</form>
+
+<h2>Cost (from measured tokens)</h2>
+<div class=card><span id=cost class=muted>…</span></div>
+
+<h2>Recent runs</h2>
+<table><thead><tr><th>time</th><th>node</th><th>task</th><th>adapter</th><th>result</th><th>iters</th><th>ms</th><th>tok in/out</th></tr></thead>
+<tbody id=runs></tbody></table>
+
+<script>
+// token-aware fetch: send x-panel-token from localStorage; on 401 prompt once and retry.
+async function api(path, opt={}){
+  const tok=localStorage.getItem('panelToken')||'';
+  opt.headers=Object.assign({}, opt.headers, tok?{'x-panel-token':tok}:{});
+  let r=await fetch(path,opt);
+  if(r.status===401){
+    const t=prompt('This panel is protected. Enter the PANEL_TOKEN:');
+    if(t){localStorage.setItem('panelToken',t);return api(path,opt);}
+  }
+  return r.json();
+}
+const TASKS=['hello-sum','grading'];
+function sel(id,arr){document.getElementById(id).innerHTML=arr.map(x=>'<option>'+x+'</option>').join('')}
+async function nodes(){
+  const d=await api('/api/nodes'); const ns=d.nodes||[];
+  if(d.demo){const b=document.getElementById('banner');b.style.display='block';
+    b.innerHTML='<b>DEMO MODE</b> — showing sample data. To go live: set the <code>NODES</code> env var (public agent-node URLs + tokens) and <code>PANEL_TOKEN</code> in Vercel, then redeploy. Runs are disabled until then.';}
+  document.getElementById('nodes').innerHTML=ns.map(n=>
+    '<div class=card><div><span class="dot '+(n.ok?'ok':'bad')+'"></span><b>'+n.name+'</b> <span class=muted>'+(n.kind||'http')+'</span></div>'+
+    '<div class=muted>'+(n.ok?('adapters: '+(n.adapters||[]).length+(n.running!=null?' · running '+n.running:'')+(n.load!=null?' · load '+Number(n.load).toFixed(2):'')):('down: '+(n.error||'')))+'</div></div>').join('');
+  sel('node',ns.map(n=>n.name));
+  const ad=[...new Set(ns.flatMap(n=>n.adapters||[]))]; sel('adapter',ad.length?ad:['mock','ollama']);
+  sel('task',TASKS);
+}
+async function runs(){const d=await api('/api/runs?limit=25');
+ document.getElementById('runs').innerHTML=(d.runs||[]).map(r=>'<tr><td class=muted>'+(r.ts||'').replace('T',' ').slice(5,19)+'</td><td>'+r.node+'</td><td>'+r.task+'</td><td>'+r.adapter+'</td>'+
+  '<td class="'+(r.result==='passed'?'pass':'fail')+'">'+r.result+'</td><td>'+r.iterations+'</td><td>'+r.wall_ms+'</td><td class=muted>'+(r.tokens_in||0)+'/'+(r.tokens_out||0)+'</td></tr>').join('')}
+async function cost(){const c=await api('/api/cost');
+ const rows=Object.entries(c.byAdapter||{}).map(([a,v])=>a+': '+v.runs+' runs, $'+v.usd.toFixed(6)+' ('+v.model+')').join(' · ');
+ document.getElementById('cost').innerHTML='<span class=big>$'+(c.totalUsd||0).toFixed(6)+'</span> across '+(c.runs||0)+' runs &nbsp; <span class=muted>'+rows+'</span>'}
+document.getElementById('launch').onsubmit=async e=>{e.preventDefault();
+ const b={node:node.value,task:task.value,adapter:adapter.value};
+ const r=await api('/api/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
+ document.getElementById('launchmsg').textContent=r.error?('✗ '+r.error):('✓ started '+(r.runId||''));
+ setTimeout(refresh,1500)}
+function refresh(){nodes();runs();cost()}
+refresh();setInterval(refresh,4000);
+</script></body></html>
