@@ -1,0 +1,29 @@
+{
+  "_comment": "USD per 1,000,000 tokens. Verify cloud prices against current provider pricing before relying on them. Local/ollama = $0 (your electricity only).",
+  "models": {
+    "ollama/qwen3:8b":      { "in": 0,     "out": 0,     "note": "local, offline, $0 marginal" },
+    "ollama/deepseek-r1:8b":{ "in": 0,     "out": 0,     "note": "local, offline, $0 marginal" },
+    "claude-opus-4-8":      { "in": 5.00,  "out": 25.00, "note": "Anthropic list" },
+    "claude-sonnet-4-6":    { "in": 3.00,  "out": 15.00, "note": "Anthropic list" },
+    "claude-haiku-4-5":     { "in": 1.00,  "out": 5.00,  "note": "Anthropic list" },
+    "claude-fable-5":       { "in": 10.00, "out": 50.00, "note": "Anthropic list" },
+    "openrouter/qwen3-8b":  { "in": 0.035, "out": 0.138, "note": "approx OpenRouter, verify" }
+  },
+  "adapterModel": {
+    "mock":   "ollama/qwen3:8b",
+    "ollama": "ollama/qwen3:8b",
+    "hermes": "claude-haiku-4-5",
+    "claude": "claude-opus-4-8",
+    "nemo":   "ollama/qwen3:8b"
+  },
+  "infra": {
+    "_comment": "Monthly $ to KEEP A NODE RUNNING. Amortized per-run in cost.js if you set runsPerMonth.",
+    "options": {
+      "local-mac":      { "usd_month": 0,    "note": "your own machine, $0 incremental" },
+      "vps-hetzner-cx22": { "usd_month": 4.5, "note": "2 vCPU / 4GB — runs OpenClaw/Hermes gateway + ollama small models" },
+      "vps-do-basic":   { "usd_month": 6.0,  "note": "DigitalOcean 1GB droplet" },
+      "modal-serverless": { "usd_month": 0,  "note": "hibernates idle; pay per-second of compute only (Hermes modal/daytona backend)" },
+      "gpu-rtx4090-rented": { "usd_month": 320, "note": "~$0.44/hr if you need a real local LLM at speed" }
+    }
+  }
+}

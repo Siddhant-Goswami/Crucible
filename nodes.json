@@ -1,0 +1,15 @@
+{
+  "_comment": "Registry of agent instances the panel manages. 'local' runs loop.sh in-process. 'http' nodes are agent-node.js daemons on other machines — for remote, set url to an SSH tunnel (ssh -L 7077:127.0.0.1:7077 user@vps) and a matching token.",
+  "nodes": [
+    {
+      "name": "local",
+      "kind": "local"
+    },
+    {
+      "name": "vps-1",
+      "kind": "http",
+      "url": "http://127.0.0.1:7077",
+      "token": ""
+    }
+  ]
+}
