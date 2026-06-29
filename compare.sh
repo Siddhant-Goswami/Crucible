@@ -26,16 +26,26 @@ if [ ${#TASKS[@]} -eq 0 ]; then
 fi
 
 # --- adapter availability -----------------------------------------------------
+MAX_ITERS="${MAX_ITERS:-5}"
+PATH="$HOME/.hermes/bin:$HOME/.local/bin:$PATH"   # find hermes/openclaw if installed
 ollama_up=0
 curl -s "${OLLAMA_HOST:-http://localhost:11434}/api/tags" >/dev/null 2>&1 && ollama_up=1
 claude_ok=0
 [ "${RUN_CLAUDE:-0}" = "1" ] && command -v claude >/dev/null 2>&1 && claude_ok=1
+hermes_ok=0;   command -v hermes   >/dev/null 2>&1 && hermes_ok=1
+openclaw_ok=0; command -v openclaw >/dev/null 2>&1 && openclaw_ok=1
+pi_ok=0;       command -v pi       >/dev/null 2>&1 && pi_ok=1
+goose_ok=0;    command -v goose    >/dev/null 2>&1 && goose_ok=1
 
 adapters_for() {  # which adapters apply to a given task
   local name; name="$(basename "$1")"
   [ "$name" = "hello-sum" ] && echo "mock"   # mock is the sum.js-specific baseline
-  [ "$ollama_up" = "1" ] && echo "ollama"
-  [ "$claude_ok" = "1" ] && echo "claude"
+  [ "$ollama_up" = "1" ]   && echo "ollama"     # raw local qwen3:8b (HTTP) — control
+  [ "$hermes_ok" = "1" ]   && echo "hermes"     # local qwen3:8b via Hermes   ($0)
+  [ "$openclaw_ok" = "1" ] && echo "openclaw"   # local qwen3:8b via OpenClaw ($0)
+  [ "$pi_ok" = "1" ]       && echo "pi"         # local qwen3:8b via Pi       ($0)
+  [ "$goose_ok" = "1" ]    && echo "goose"      # local qwen3:8b via Goose    ($0)
+  [ "$claude_ok" = "1" ]   && echo "claude"     # Claude Opus 4.8 (cloud, $)
 }
 
 cost_of() {  # <adapter> <tok_in> <tok_out> -> "$0" or "$0.0123"
@@ -71,7 +81,7 @@ for task in "${TASKS[@]}"; do
   while IFS= read -r a; do
     [ -z "$a" ] && continue
     echo "    - adapter: $a ..." >&2
-    ./loop.sh "$task" "$a" 5 >/dev/null 2>&1 || true
+    ./loop.sh "$task" "$a" "$MAX_ITERS" >/dev/null 2>&1 || true
     rj=".runs/$name.$a/result.json"
     if [ -f "$rj" ]; then
       read -r res iters wall tin tout <<<"$(jq -r '[.result,.iterations,.wall_ms,.tokens_in,.tokens_out]|@tsv' "$rj")"
@@ -87,19 +97,27 @@ for task in "${TASKS[@]}"; do
 done
 
 {
-  echo "## Adapter availability this run"
+  echo "## Adapter availability this run (max_iters=$MAX_ITERS)"
   echo "- **mock** — deterministic sum.js baseline (applies to \`hello-sum\` only)."
   if [ "$ollama_up" = "1" ]; then
     echo "- **ollama** — REAL local model (\`${OLLAMA_MODEL:-qwen3:8b}\`), offline, \$0 marginal."
   else
     echo "- **ollama** — SKIPPED (server not reachable at ${OLLAMA_HOST:-http://localhost:11434})."
   fi
+  [ "$hermes_ok" = "1" ]   && echo "- **hermes** — Hermes Agent (\`hermes -z\`) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **hermes** — SKIPPED (not installed; see LEARNINGS.md §6)."
+  [ "$openclaw_ok" = "1" ] && echo "- **openclaw** — OpenClaw embedded agent (\`openclaw agent --local\`) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **openclaw** — SKIPPED (npm i -g openclaw)."
+  [ "$pi_ok" = "1" ]       && echo "- **pi** — Pi minimal agent (\`pi -p\`, 4 tools) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **pi** — SKIPPED (npm i -g @mariozechner/pi-coding-agent)."
+  [ "$goose_ok" = "1" ]    && echo "- **goose** — Goose (\`goose run\`) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **goose** — SKIPPED (see LEARNINGS.md §6)."
   if [ "$claude_ok" = "1" ]; then
     echo "- **claude** — REAL Claude Code headless (\`claude -p\`, priced as claude-opus-4-8; spends tokens)."
   else
     echo "- **claude** — SKIPPED (set RUN_CLAUDE=1 and install claude to include it)."
   fi
-  echo "- **hermes / nemo** — not installed (see LEARNINGS.md)."
+  echo "- **nemo** — not installed (greenfield scaffolder; see LEARNINGS.md §5)."
 } >> "$OUT"
 
 echo "================ comparison ================"

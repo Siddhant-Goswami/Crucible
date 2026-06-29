@@ -1,0 +1,47 @@
+{
+  "_comment": "Static, qualitative properties of each harness — the 'what kind of harness is this' half of the benchmark, to read alongside the empirical scorecard (benchmark.js). System-prompt sizes and positioning are sourced from the references in BENCHMARK.md; sizes marked ~ are approximate / from those write-ups, not measured here.",
+  "harnesses": {
+    "mock": {
+      "name": "mock (baseline)", "creator": "this repo", "language": "bash",
+      "positioning": "deterministic control — no model, applies known-good fix",
+      "system_prompt_tokens": 0, "tools": "n/a", "offline": true,
+      "headless": "adapters/mock.sh"
+    },
+    "ollama": {
+      "name": "ollama (raw model)", "creator": "this repo + Ollama", "language": "bash",
+      "positioning": "CONTROL: the model with the THINNEST possible harness (our loop's file-block parser) — isolates 'what the harness adds' vs raw qwen3:8b",
+      "system_prompt_tokens": "~0.2k", "tools": "write (file-block parser)", "offline": true,
+      "headless": "HTTP /api/generate"
+    },
+    "pi": {
+      "name": "Pi", "creator": "Mario Zechner (libGDX)", "language": "TypeScript",
+      "positioning": "MINIMALIST: sub-1k system prompt, total transparency, BYOK; the deliberate anti-bloat harness (same pi-ai stack powers OpenClaw)",
+      "system_prompt_tokens": "<1k (sourced)", "tools": "4 (read, write, edit, bash)", "offline": true,
+      "headless": "pi -p"
+    },
+    "goose": {
+      "name": "Goose", "creator": "Block / Agentic AI Foundation", "language": "Rust",
+      "positioning": "model-agnostic, extensible; signature feature = YAML 'recipes' (shareable workflows); on-machine",
+      "system_prompt_tokens": "~mid (extensions add tools)", "tools": "many (developer + extensions/MCP)", "offline": true,
+      "headless": "goose run --no-session -q -t"
+    },
+    "hermes": {
+      "name": "Hermes Agent", "creator": "Nous Research", "language": "Python",
+      "positioning": "safety-first lean harness: agentskills.io skills, command-approval + sandbox backends, purpose-built headless one-shot",
+      "system_prompt_tokens": "~mid", "tools": "read/write/edit/bash + skills", "offline": true,
+      "headless": "hermes -z"
+    },
+    "openclaw": {
+      "name": "OpenClaw", "creator": "openclaw/openclaw", "language": "TypeScript",
+      "positioning": "personal-assistant CHAT GATEWAY (not a coding harness) with an embedded agent; included to test the contract's edges",
+      "system_prompt_tokens": "~mid", "tools": "read/write/edit/bash + channels", "offline": true,
+      "headless": "openclaw agent --local"
+    },
+    "claude": {
+      "name": "Claude Code", "creator": "Anthropic", "language": "TypeScript",
+      "positioning": "batteries-included frontier harness: multi-file autonomy, sub-agents, GitHub PR review; the reference the others are measured against",
+      "system_prompt_tokens": "~14.3k (sourced)", "tools": "many (Read/Edit/Write/Bash/Task/…)", "offline": false,
+      "headless": "claude -p"
+    }
+  }
+}

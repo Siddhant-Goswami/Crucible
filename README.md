@@ -47,7 +47,7 @@ GRADER=ollama ./scripts/grade-all.sh     # REAL local-model grading, offline, $0
 ```
 loop.sh ─ owns the bounded act→verify loop, sandboxes each run into .runs/
   └─ calls adapters/<name>.sh <workdir> <iter> <feedback>   ← the swappable harness
-        mock · ollama · claude · hermes · nemo
+        mock · ollama · pi · hermes · openclaw · goose · claude · nemo
 tasks/hello-sum/ ─ TASK.md (goal) + verify.sh (rules-based gate, exit 0/2)
 compare.sh ─ runs the task across all installed adapters → results/comparison.md
 loops/ ─ vendored copy of 100x-loops (01-grading-loop has a GRADER=ollama backend added)
@@ -60,9 +60,34 @@ loops/ ─ vendored copy of 100x-loops (01-grading-loop has a GRADER=ollama back
 **Adapter contract:** `adapters/<name>.sh <workdir> <iter> <feedback-file>` — read
 the goal from `TASK.md`, read the last verifier feedback, make **one** attempt by
 editing files in `workdir`. That's the entire integration surface for a new harness.
-The `ollama` and `claude` adapters are **task-agnostic and multi-file**: they see the
-whole project, can rewrite several files at once, and an integrity guard stops the
-agent from "passing" by editing the tests, `verify.sh`, or `TASK.md`.
+The `ollama`, `pi`, `hermes`, `openclaw`, `goose`, and `claude` adapters are
+**task-agnostic and multi-file**: they see the whole project and can rewrite several
+files at once. **Pi, Hermes, OpenClaw, and Goose are all wired to the same local
+`qwen3:8b`** as the `ollama` adapter, so a benchmark row reflects the *harness*, not
+the model — they run offline at $0; only `claude` (Opus 4.8) is cloud. (Installing
+them: see [LEARNINGS.md](./LEARNINGS.md) §6.)
+
+## Benchmark
+
+`./benchmark.sh` runs the whole task battery through every installed harness on
+identical rules-based verifiers and writes **[results/BENCHMARK.md](./results/BENCHMARK.md)** —
+a static harness-profile table (maker, language, system-prompt size, tools) plus an
+empirical scorecard whose columns map onto Addy Osmani's
+[agent-harness-engineering](https://addyosmani.com/blog/agent-harness-engineering/)
+dimensions: **completion %**, **recovery** (avg verify→fix iterations to pass),
+**latency**, **tokens/context** (where the adapter reports them), **cost**, and
+**offline**. Holding the model constant (local `qwen3:8b`) makes the *harness* the
+only variable; `claude` is the frontier reference.
+
+```bash
+./benchmark.sh                 # all installed lean harnesses (offline, $0)
+RUN_CLAUDE=1 ./benchmark.sh    # also include Claude Opus 4.8 (spends tokens)
+```
+
+The harnesses span the design spectrum the references debate: **Pi** (sub-1k-token
+prompt, 4 tools — minimalist), **Goose** (Rust, recipes — heavier), **Hermes**
+(safety-first), **OpenClaw** (a chat gateway pressed into the contract), and **Claude
+Code** (batteries-included frontier). See [LEARNINGS.md](./LEARNINGS.md) §8 for sources.
 
 ## Tasks (the loop battery)
 

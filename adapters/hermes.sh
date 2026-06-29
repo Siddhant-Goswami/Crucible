@@ -1,31 +1,46 @@
 #!/usr/bin/env bash
-# hermes.sh — drive Hermes Agent (Nous Research) headless as the agent step.
+# hermes.sh — drive Hermes Agent (Nous Research) headless as a TASK-AGNOSTIC step.
 #
-# Hermes is the RECOMMENDED production harness in this prototype's comparison
-# (see LEARNINGS.md): same agentskills.io skill format as the 100x-loops, a
-# real safety model (command-approval + blocklist + tirith + SSRF guard, plus
-# docker/ssh sandbox backends), and a purpose-built headless mode `hermes -z`
-# that is "single prompt in, final text out" — a perfect loop adapter.
+# Hermes is the RECOMMENDED production harness in this prototype's comparison (see
+# LEARNINGS.md): same agentskills.io skill format as the 100x-loops, a real safety
+# model (command-approval + sandbox backends), and a purpose-built headless mode
+# `hermes -z` ("single prompt in, final text out") that is a perfect loop adapter.
 #
-# Not installed by default here (it's a curl|bash install + Node/Playwright deps).
-# To enable, see LEARNINGS.md §"Wiring Hermes live". For a SAFE + LEAN + OFFLINE
-# Hermes, configure it before running:
-#   hermes config set terminal.backend local        # leanest; or 'docker' for isolation
-#   hermes config set model.provider custom          # point at local Ollama:
+# Wired here to the SAME local Ollama qwen3:8b the `ollama` adapter uses, so the
+# comparison isolates the HARNESS, not the model (offline, $0). One-time config
+# (already applied on this machine — see LEARNINGS.md §6):
+#   hermes config set model.provider ollama
 #   hermes config set model.base_url http://localhost:11434/v1
-#   # keep command-approval = manual (default); never --yolo on the local backend
+#   hermes config set model.default qwen3:8b
+#   hermes config set model.context_length 65536   # Hermes requires >=64K context
+#   hermes config set model.ollama_num_ctx 65536   # make Ollama load it at 64K
+#   hermes config set terminal.backend local       # leanest; 'docker' for isolation
+#
+# `hermes -z PROMPT` prints ONLY the final response and auto-bypasses command
+# approvals (it's intended for scripts), editing files with its own read/write/edit
+# tools in the current directory. The rules-based verifier still owns done/keep-going.
 #
 # Contract: hermes.sh <workdir> <iter> <feedback-file>
 set -uo pipefail
+export PATH="$HOME/.hermes/bin:$HOME/.local/bin:$PATH"
 WORK="$1"; FEEDBACK="$3"
-command -v hermes >/dev/null 2>&1 || { echo "hermes not installed — see LEARNINGS.md" >&2; exit 1; }
+command -v hermes >/dev/null 2>&1 || { echo "hermes not installed — see LEARNINGS.md §6" >&2; exit 1; }
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
-FB=""; [ -s "$FEEDBACK" ] && FB="Previous verifier feedback: $(cat "$FEEDBACK")"
+FB=""
+[ -s "$FEEDBACK" ] && FB="The previous attempt FAILED the verifier. Feedback:
+$(cat "$FEEDBACK")"
 
 cd "$WORK"
 # -z is Hermes' headless one-shot entrypoint (no banner/spinner; final text only).
-hermes -z "In the current directory, fix sum.js so that 'node --test' passes.
+hermes -z "You are an automated coding agent working in the current directory.
+Make this project's rules-based verifier (./verify.sh) pass.
+
+TASK:
 $TASK
+
 $FB
-Edit sum.js in place. Do not change the test file. Output nothing else." >/dev/null 2>&1 || true
+
+Rules: edit/create only the SOURCE or artifact files the task asks for. NEVER edit
+test files (*.test.js), verify.sh, or TASK.md. You may touch multiple files.
+Output nothing but your edits." >/dev/null 2>&1 || true
