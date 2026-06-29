@@ -9,5 +9,9 @@ loops/01-grading-loop/out/
 loops/01-grading-loop/grades.jsonl
 loops/01-grading-loop/review-queue/
 
+# secrets — your Telegram bot token lives here, never committed
+.env.telegram
+.env*.local
+
 # os cruft
 .DS_Store

@@ -100,16 +100,27 @@ The panel now manages the remote box as if it were local. Repeat per machine.
 (`getUpdates`), so it needs **no public URL / webhook** — it runs fine on a laptop
 or a $4 VPS behind NAT.
 
-### Setup (~2 min)
-1. In Telegram, message **@BotFather** → `/newbot` → copy the bot token.
-2. Message your new bot once, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` and read `message.chat.id` (your chat id).
-3. Run it (panel.js must be up):
-```bash
-TELEGRAM_BOT_TOKEN=123456:ABC... \
-TELEGRAM_ALLOWED_CHATS=<your-chat-id> \
-PANEL_URL=http://127.0.0.1:8088 \
-node telegram-bot.js
-```
+### Setup (~2 min, turn-key)
+1. In Telegram, message **@BotFather** → `/newbot` → follow the prompts → copy the bot token.
+2. Put your secrets in a gitignored file (never on the command line):
+   ```bash
+   cp .env.telegram.example .env.telegram
+   # edit .env.telegram, paste your TELEGRAM_BOT_TOKEN
+   ```
+3. Find your chat id: open Telegram, send your new bot any message (e.g. `hi`), then:
+   ```bash
+   set -a; . ./.env.telegram; set +a; node telegram-whoami.js
+   ```
+   Copy the printed id into `TELEGRAM_ALLOWED_CHATS` in `.env.telegram`.
+4. Launch (starts the panel too if it isn't running):
+   ```bash
+   ./telegram.sh
+   ```
+   Then message your bot `/nodes`.
+
+> Your token lives only in `.env.telegram` (gitignored) — it never enters the
+> repo, the chat, or your shell history. `TELEGRAM_ALLOWED_CHATS` is a hard
+> allowlist; the bot ignores every other chat.
 
 ### Commands
 | Command | Does |
