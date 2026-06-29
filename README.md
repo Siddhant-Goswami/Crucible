@@ -24,9 +24,13 @@ the "brain" — and run the *same* task through each on the *same* verifier.
 # 2) A REAL agent on a LOCAL model (needs `ollama` running with a model, e.g. qwen3:8b):
 ./loop.sh tasks/hello-sum ollama
 
-# 3) Compare every available harness on the same task/verifier:
-./compare.sh                  # mock + ollama (offline, free)
-RUN_CLAUDE=1 ./compare.sh     # also run claude -p (spends tokens)
+# 3) A more complex loop — research-to-artifact (build a QA'd, sourced deck):
+./loop.sh tasks/research-deck ollama
+
+# 4) Compare every available harness across the whole task battery:
+./compare.sh                              # all tasks × offline adapters (free)
+./compare.sh tasks/research-deck          # just one task
+RUN_CLAUDE=1 ./compare.sh                 # also run claude -p (spends tokens)
 ```
 
 Drive **the actual 100x-loops** with a local model (the grading loop, extended
@@ -56,6 +60,28 @@ loops/ ─ vendored copy of 100x-loops (01-grading-loop has a GRADER=ollama back
 **Adapter contract:** `adapters/<name>.sh <workdir> <iter> <feedback-file>` — read
 the goal from `TASK.md`, read the last verifier feedback, make **one** attempt by
 editing files in `workdir`. That's the entire integration surface for a new harness.
+The `ollama` and `claude` adapters are **task-agnostic and multi-file**: they see the
+whole project, can rewrite several files at once, and an integrity guard stops the
+agent from "passing" by editing the tests, `verify.sh`, or `TASK.md`.
+
+## Tasks (the loop battery)
+
+Every task is just `TASK.md` (goal) + `verify.sh` (rules-based gate, exit 0/2) — plus
+whatever files the agent must touch. The same swappable adapter runs all of them.
+
+| Task | Shape | What the rules-based gate enforces |
+|------|-------|------------------------------------|
+| `hello-sum` | fix 1 file | `node --test` passes |
+| `fizzbuzz` | fix 1 file | FizzBuzz divisibility rules |
+| `roman-numerals` | fix 1 file | subtractive numerals (`IV`, `IX`, `CM`…) |
+| `temp-convert` | fix **2 files** | both converters + the `-40` fixed point |
+| `research-deck` | **generate** an artifact | Loop 02 ported: a deck covering every topic, **every claim sourced**, every slide has speaker notes (≥5 slides, title+summary) |
+| `self-improving-rubric` | **propose a rule change** | Loop 03 ported: a calibration block that encodes **every** open instructor correction (id + verbatim lesson) — an incomplete proposal is *not* done |
+
+The last two are the [100x-loops](https://github.com/Siddhant-Goswami/100x-loops)
+`02-research-to-artifact` (orchestrator-worker + evaluator-optimizer) and
+`03-self-improving` (the meta-loop that edits its own rules) ported to the
+harness-agnostic runner — same rules-based gates, now driven by any adapter.
 
 ## The pick
 

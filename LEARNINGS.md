@@ -152,6 +152,39 @@ rules-based verifier caught a mistake a real LLM kept making** — and an LLM-as
 would almost certainly have rubber-stamped (the model's *prose reasoning* sounded
 perfectly plausible). Rules-based verification isn't a nicety; it's the load-bearing wall.
 
+### 4c. Full battery — local model vs. Claude Opus 4.8, across complex loops
+
+Six tasks, one rules-based gate each, run through both real harnesses
+(`RUN_CLAUDE=1 ./compare.sh`). The battery grew beyond bug-fixes to cover the two
+harder 100x-loops, ported to the harness-agnostic runner: **`research-deck`**
+(Loop 02, research-to-artifact: assemble a deck where every claim is sourced and
+every slide has speaker notes) and **`self-improving-rubric`** (Loop 03, the
+meta-loop: propose a calibration block that encodes every open instructor correction).
+
+| Task | ollama (qwen3:8b) | claude (Opus 4.8) |
+|------|------------------:|------------------:|
+| `hello-sum` | ✅ 1 iter · $0 | ✅ 1 iter · $0.55 |
+| `fizzbuzz` | ✅ 1 iter · $0 | ✅ 1 iter · $0.89 |
+| `roman-numerals` | ✅ 1 iter · $0 | ✅ 1 iter · $0.90 |
+| `temp-convert` (2 files) | ✅ 1 iter · $0 | ✅ 1 iter · $0.73 |
+| `research-deck` (Loop 02) | ✅ 1 iter · $0 | ✅ 1 iter · $0.85 |
+| `self-improving-rubric` (Loop 03) | ✅ 1 iter · $0 | ✅ 1 iter · $0.58 |
+
+**Both harnesses pass every task on the first iteration** — the rules-based gate
+records identical *outcomes*. The only axis that moves is cost: the local model is
+**$0 marginal**, Claude averages **~$0.72/run** (priced as Opus 4.8; Claude's input
+is dominated by cached system/tools counted here at full rate — a deliberate upper
+bound). Takeaways:
+
+- The harness-agnostic adapter generalizes past toy bug-fixes: the *same* one-line
+  contract drove a multi-file fix, a sourced-artifact generation, and a self-modifying
+  rule proposal. The integrity guard (can't edit tests / `verify.sh` / `TASK.md`) is
+  what makes "the model passed the gate" trustworthy across all of them.
+- For bounded, rules-verifiable tasks like these, a lean local harness matches a
+  frontier one on the outcome the gate measures — so paying frontier per-token prices
+  buys nothing the verifier can see. Spend it where the task genuinely needs the
+  capability, not on work a $0 local model already passes.
+
 ---
 
 ## 5. Key learnings & gotchas (discovered while building)
