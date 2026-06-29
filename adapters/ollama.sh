@@ -1,56 +1,80 @@
 #!/usr/bin/env bash
-# ollama.sh — a REAL agent step backed by a LOCAL model (offline, zero API cost).
+# ollama.sh — a REAL, TASK-AGNOSTIC agent step backed by a LOCAL model.
 #
-# This is the "safe + lean to run AS OF NOW" path: the model runs on your machine
-# via Ollama's HTTP API, so there is no network call off-box, no API key, and no
-# per-token cost. The only side effect is writing sum.js inside the sandboxed
-# workdir.
+# Offline, zero API cost: the model runs on your machine via Ollama's HTTP API,
+# so there is no off-box network call, no API key, and no per-token charge. The
+# only side effects are writes to SOURCE files inside the sandboxed workdir.
 #
-# It demonstrates the genuine agent loop: the model proposes a fix from the task
-# + the *previous verifier feedback*, we apply it, and the rules-based gate decides
-# whether to stop or feed the failure back for another attempt.
+# Unlike the original single-file version, this adapter works for ANY task in
+# tasks/: it shows the model every project file, asks it to return the complete
+# new contents of whichever files it wants to change (multi-file capable), and
+# applies those edits with path sanitization. The verifier still owns done/keep-going.
 #
 # Design notes (see LEARNINGS.md "Gotchas"):
 #   - We call the HTTP API (/api/generate), NOT `ollama run`, because the CLI emits
 #     TTY spinner/cursor escape codes even when piped — the API returns clean JSON.
-#   - think:false disables qwen3/deepseek-r1 chain-of-thought — ~10x faster and no
-#     reasoning prose leaking into the file.
-#   - We force the model to wrap the file in ===BEGIN===/===END=== sentinels and
-#     extract between them, which is robust to any stray commentary.
+#   - think:false disables qwen3/deepseek-r1 chain-of-thought — faster, no reasoning
+#     prose leaking into files.
+#   - The model returns each changed file wrapped in ===FILE: <path>=== / ===END===
+#     sentinels; a small node parser extracts + applies them. This is far more
+#     robust for weak local models than unified diffs (no exact-line-match needed).
+#   - Integrity guard: the parser REFUSES to write test files, verify.sh or TASK.md,
+#     and rejects path traversal (.. / absolute paths) — a model can't "pass" by
+#     rewriting the test or escaping the sandbox.
 #
 # Contract: ollama.sh <workdir> <iter> <feedback-file>
 # Env: OLLAMA_MODEL (default qwen3:8b), OLLAMA_HOST (default http://localhost:11434)
+#      OLLAMA_TEMPERATURE (default 0 — deterministic, for fair benchmarking)
 set -uo pipefail
 WORK="$1"; ITER="$2"; FEEDBACK="$3"
 MODEL="${OLLAMA_MODEL:-qwen3:8b}"
 HOST="${OLLAMA_HOST:-http://localhost:11434}"
+TEMP="${OLLAMA_TEMPERATURE:-0}"
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
-CODE="$(cat "$WORK/sum.js" 2>/dev/null)"
 FB=""; [ -s "$FEEDBACK" ] && FB="$(cat "$FEEDBACK")"
 
-PROMPT="You are an automated code-fixing agent. Output ONLY the complete corrected
-contents of the file sum.js, wrapped EXACTLY between these markers:
-===BEGIN===
-<file contents>
-===END===
-No markdown fences, no commentary outside the markers.
+# --- assemble the project context the model sees ------------------------------
+# Every regular file except the harness plumbing and VCS/dependency noise. Test
+# files ARE shown (so the model knows the expected behavior) but are never written.
+CTX=""
+while IFS= read -r f; do
+  CTX="$CTX
+--- BEGIN FILE: $f ---
+$(cat "$WORK/$f")
+--- END FILE: $f ---
+"
+done < <(cd "$WORK" && find . -type f \
+  -not -path './node_modules/*' -not -path './.git/*' \
+  -not -name '.*' -not -name 'verify.sh' -not -name 'TASK.md' -not -name 'result.json' \
+  | sed 's|^\./||' | sort)
 
-GOAL:
+PROMPT="You are an automated coding agent. Fix the SOURCE files so the project's
+test suite passes.
+
+OUTPUT FORMAT — for EACH file you want to change, emit a block EXACTLY like:
+===FILE: relative/path.js===
+<the complete new contents of that file>
+===END===
+Rules: output ONLY these blocks, nothing else. No markdown fences, no commentary.
+You may emit multiple file blocks. NEVER edit test files (*.test.js) or verify.sh.
+
+TASK:
 $TASK
 
-CURRENT sum.js:
-$CODE"
+PROJECT FILES:
+$CTX"
 if [ -n "$FB" ]; then
   PROMPT="$PROMPT
 
 The previous attempt FAILED the test suite. Verifier said:
 $FB
-Fix the bug and output the corrected sum.js."
+Return the corrected file(s)."
 fi
 
-RESP="$(curl -s "$HOST/api/generate" \
-  -d "$(jq -n --arg m "$MODEL" --arg p "$PROMPT" '{model:$m, prompt:$p, stream:false, think:false}')")"
+RESP="$(curl -s "$HOST/api/generate" -d "$(jq -n \
+  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" \
+  '{model:$m, prompt:$p, stream:false, think:false, options:{temperature:$t}}')")"
 
 TEXT="$(printf '%s' "$RESP" | jq -r '.response // empty')"
 
@@ -61,15 +85,39 @@ OUT="$(printf '%s' "$RESP" | jq -r '.eval_count // 0')"
 PREV_IN=0; PREV_OUT=0
 if [ -f "$WORK/.tokens" ]; then read -r PREV_IN PREV_OUT < "$WORK/.tokens"; fi
 echo "$(( PREV_IN + IN )) $(( PREV_OUT + OUT ))" > "$WORK/.tokens"
-CLEAN="$(printf '%s' "$TEXT" \
-  | awk '/===BEGIN===/{f=1;next} /===END===/{f=0} f' \
-  | sed -E '/^[[:space:]]*```/d')"
 
-# Only overwrite if the output actually looks like the module (defensive: a bad
-# generation leaves the file unchanged, the verifier fails, and the loop retries
-# or hits max_iters — an honest failure rather than a corrupted file).
-if printf '%s' "$CLEAN" | grep -q 'module.exports'; then
-  printf '%s\n' "$CLEAN" > "$WORK/sum.js"
-else
-  echo "  (ollama: no usable module in response; leaving file unchanged)" >&2
-fi
+# --- apply the model's file blocks (robust parse + sandbox guard) -------------
+printf '%s' "$TEXT" | node -e '
+  const fs = require("fs"), path = require("path");
+  const work = path.resolve(process.argv[1]);
+  let text = "";
+  process.stdin.on("data", d => text += d).on("end", () => {
+    const re = /===FILE:\s*(.+?)\s*===\r?\n([\s\S]*?)\r?\n?===END===/g;
+    // never let the model overwrite the test, the gate, or the goal
+    const forbid = /(^|\/)(verify\.sh|TASK\.md)$|\.test\.js$|[-_]test\.js$|(^|\/)test\.js$/;
+    let m, wrote = 0;
+    while ((m = re.exec(text))) {
+      let rel = m[1].trim().replace(/^\.\//, "");
+      let body = m[2]
+        .replace(/^[ \t]*```[a-zA-Z0-9]*[ \t]*\r?\n/, "")  // strip a leading ``` fence
+        .replace(/\r?\n[ \t]*```[ \t]*$/, "");             // and a trailing one
+      if (rel.startsWith("/") || rel.split("/").includes("..")) {
+        console.error("  (ollama: skip unsafe path " + rel + ")"); continue;
+      }
+      if (forbid.test(rel)) {
+        console.error("  (ollama: refusing to write protected file " + rel + ")"); continue;
+      }
+      const dest = path.resolve(work, rel);
+      if (dest !== work && !dest.startsWith(work + path.sep)) {
+        console.error("  (ollama: path escapes sandbox " + rel + ")"); continue;
+      }
+      if (!body.endsWith("\n")) body += "\n";
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, body);
+      console.error("  (ollama: wrote " + rel + ")");
+      wrote++;
+    }
+    if (!wrote) console.error("  (ollama: no usable file blocks in response; leaving files unchanged)");
+    process.exit(0);
+  });
+' "$WORK"
