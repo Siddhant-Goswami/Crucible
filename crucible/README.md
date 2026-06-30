@@ -4,6 +4,9 @@
 principles distilled from the 2026 harness literature in
 [`../docs/harness-first-principles.md`](../docs/harness-first-principles.md).
 
+> 🆕 **New here?** Start with the plain-English [beginner's explainer](../docs/crucible-explainer.md)
+> — what a harness is, what Crucible measures, and how to run it from zero.
+
 A harness is what turns a stateless model into an agent (`Agent = Model + Harness`). Most
 benchmarks score the model's *final answer*; Crucible scores the *harness* by holding the
 model fixed and measuring **the run**. It exists because the literature is unanimous that
@@ -13,6 +16,9 @@ output-only, single-run, model-entangled scoring cannot tell you whether a harne
 > can implement against any harness. This directory is the **reference implementation** that
 > proves the spec on `nemo-claw`'s adapters. Every metric is justified against a first
 > principle (P1–P9) and a source paper in [`RATIONALE.md`](./RATIONALE.md).
+>
+> **Results & methodology writeup → [`../docs/crucible-results.md`](../docs/crucible-results.md)** —
+> the headline battery, the harness/model panel, and how to reproduce it.
 
 ## What it measures
 

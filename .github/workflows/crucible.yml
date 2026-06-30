@@ -1,0 +1,36 @@
+name: crucible
+on:
+  push:
+    paths: ['crucible/**', 'loop.sh', 'adapters/**', 'tasks/**', '.github/workflows/crucible.yml']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Unit tests (node --test)
+        run: node --test crucible/test/*.test.js
+
+      - name: Shell lint (bash -n)
+        run: |
+          set -e
+          for f in $(git ls-files | grep '\.sh$'); do echo "  bash -n $f"; bash -n "$f"; done
+
+      - name: JS syntax (node --check)
+        run: |
+          set -e
+          for f in $(git ls-files | grep '^crucible/.*\.js$'); do echo "  node --check $f"; node --check "$f"; done
+
+      - name: Every task.yaml parses
+        run: |
+          set -e
+          for d in $(git ls-files | grep 'task\.yaml$' | xargs -n1 dirname); do
+            echo "  parse $d/task.yaml"
+            node crucible/lib/taskmeta.js "$d" >/dev/null
+          done

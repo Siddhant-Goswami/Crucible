@@ -1,0 +1,12 @@
+id: api-migration
+tier: T2
+domain: software-engineering
+capability_tags: [multi-file, refactor, state, consistency]
+budgets:
+  max_iters: 6
+  max_tokens: 140000
+  wall_timeout_s: 600
+oracle:
+  type: tests
+  partial_credit: true
+seeds: [1, 2, 3]

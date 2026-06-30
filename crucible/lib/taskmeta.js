@@ -23,9 +23,16 @@ function scalar(v) {
 }
 
 function stripComment(line) {
-  // remove a trailing " # comment" but not '#' inside quotes (our files don't use # in values)
-  const i = line.indexOf(' #');
-  return i >= 0 ? line.slice(0, i) : line;
+  // remove a trailing "# comment" (at line start or after whitespace), but NOT a '#' inside a
+  // quoted scalar — so values like `note: "fix #12"` survive.
+  let q = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) { if (c === q) q = null; }
+    else if (c === '"' || c === "'") q = c;
+    else if (c === '#' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i).replace(/\s+$/, '');
+  }
+  return line;
 }
 
 function parseYaml(text) {

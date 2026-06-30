@@ -21,46 +21,21 @@ const rows = fs.readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean).map(JSO
 if (!rows.length) { console.error('empty ledger: ' + LEDGER); process.exit(1); }
 
 // ---- helpers -----------------------------------------------------------------
-const mean = a => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
+const { mean, bootCI, pairedBoot, priceRun } = require('./lib/stats');
 const r2 = x => Math.round(x * 100) / 100;
 const r3 = x => Math.round(x * 1000) / 1000;
-function bootCI(arr, B = 2000) {
-  if (arr.length < 2) return [arr[0] ?? 0, arr[0] ?? 0];
-  const ms = [];
-  for (let b = 0; b < B; b++) {
-    let s = 0; for (let i = 0; i < arr.length; i++) s += arr[Math.floor(Math.random() * arr.length)];
-    ms.push(s / arr.length);
-  }
-  ms.sort((x, y) => x - y);
-  return [ms[Math.floor(0.025 * B)], ms[Math.floor(0.975 * B)]];
-}
-// paired bootstrap on per-seed differences: returns {diff, lo, hi, sig}
-function pairedBoot(aBySeed, bBySeed, B = 2000) {
-  const seeds = Object.keys(aBySeed).filter(s => s in bBySeed);
-  const diffs = seeds.map(s => aBySeed[s] - bBySeed[s]);
-  if (diffs.length < 2) return { diff: mean(diffs), lo: NaN, hi: NaN, sig: false, n: diffs.length };
-  const ms = [];
-  for (let b = 0; b < B; b++) {
-    let s = 0; for (let i = 0; i < diffs.length; i++) s += diffs[Math.floor(Math.random() * diffs.length)];
-    ms.push(s / diffs.length);
-  }
-  ms.sort((x, y) => x - y);
-  const lo = ms[Math.floor(0.025 * B)], hi = ms[Math.floor(0.975 * B)];
-  return { diff: mean(diffs), lo, hi, sig: lo > 0 || hi < 0, n: diffs.length };
-}
-function priceRun(r) {
-  let key = r.model && r.model.startsWith('claude') ? r.model
-    : (r.model && r.model !== 'baseline' ? 'ollama/' + r.model : 'ollama/qwen3:8b');
-  const p = pricing.models[key] || { in: 0, out: 0 };
-  return ((r.tokens_in || 0) * p.in + (r.tokens_out || 0) * p.out) / 1e6;
-}
 
 // ---- group by (adapter, model) ----------------------------------------------
+// Timed-out cells (no result) are counted but EXCLUDED from score aggregation — you can't score
+// a run that didn't finish; they're reported separately as a cost/latency finding (honest, P7).
 const cellKey = r => r.adapter + ' @ ' + r.model;
 const cells = {};
+let totalTimeouts = 0;
 for (const r of rows) {
   const k = cellKey(r);
-  (cells[k] ||= { adapter: r.adapter, model: r.model, runs: [] }).runs.push(r);
+  const c = (cells[k] ||= { adapter: r.adapter, model: r.model, runs: [], timeouts: 0 });
+  if (r.timed_out) { c.timeouts++; totalTimeouts++; }
+  else c.runs.push(r);
 }
 const adapters = [...new Set(rows.map(r => r.adapter))];
 const models = [...new Set(rows.map(r => r.model))].filter(m => m !== 'baseline');
@@ -71,13 +46,13 @@ function agg(runs) {
   const ci = bootCI(scores);
   const succ = runs.filter(r => r.result === 'passed');
   const tok = runs.reduce((s, r) => s + (r.tokens_in || 0) + (r.tokens_out || 0), 0);
-  const cost = runs.reduce((s, r) => s + priceRun(r), 0);
+  const cost = runs.reduce((s, r) => s + priceRun(r, pricing), 0);
   return {
     n: runs.length,
     score: mean(scores), ciLo: ci[0], ciHi: ci[1],
     completion: mean(f('completion')), path: mean(f('path')), state: mean(f('state')),
     safety: mean(runs.map(r => Math.min(r.safety?.tool_sar ?? 1, r.safety?.resource_sar ?? 1, r.safety?.info_sar ?? 1))),
-    gatedPct: 100 * runs.filter(r => r.safety?.gated).length / runs.length,
+    gatedPct: runs.length ? 100 * runs.filter(r => r.safety?.gated).length / runs.length : 0,
     tokens: tok, cost,
     succPerMtok: tok ? (succ.length / (tok / 1e6)) : null,
     wall: mean(f('wall_ms')),
@@ -101,17 +76,24 @@ md.push('');
 // 1. Scorecard
 md.push('## 1. Capacity scorecard — per (harness, model)');
 md.push('');
-md.push('| Harness | Model | n | Seed | Score [95% CI] | Completion | Path | State | Safety | gated% | Cost/run | Succ/Mtok |');
-md.push('|---|---|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|');
+md.push('| Harness | Model | n | TO | Seed | Score [95% CI] | Completion | Path | State | Safety | gated% | Cost/run | Succ/Mtok |');
+md.push('|---|---|--:|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|');
 const fakeCI = [];   // unseeded, multi-seed, zero-variance cells — their tight CI is not real
 for (const k of Object.keys(cells).sort()) {
   const c = cells[k]; const s = agg(c.runs);
+  const to = c.timeouts || 0;
+  if (!s.n) {   // all cells timed out — no score to report
+    md.push(`| ${c.adapter} | ${c.model} | 0 | ${to} | — | _all timed out_ | — | — | — | — | — | — | — |`);
+    continue;
+  }
   const money = s.cost === 0 ? '$0' : '$' + (s.cost / s.n).toFixed(4);   // per RUN, not cell total
   const suspect = s.multiSeed && s.zeroVar && !s.seeded;
   if (suspect) fakeCI.push(`${c.adapter} @ ${c.model}`);
   const seedCell = s.seeded ? 'pin' : (suspect ? 'smpl⚠' : 'smpl');
-  md.push(`| ${c.adapter} | ${c.model} | ${s.n} | ${seedCell} | **${r2(s.score)}** [${r2(s.ciLo)}, ${r2(s.ciHi)}] | ${r2(s.completion)} | ${r2(s.path)} | ${r2(s.state)} | ${r2(s.safety)} | ${Math.round(s.gatedPct)}% | ${money} | ${s.succPerMtok == null ? '—' : Math.round(s.succPerMtok)} |`);
+  md.push(`| ${c.adapter} | ${c.model} | ${s.n} | ${to || ''} | ${seedCell} | **${r2(s.score)}** [${r2(s.ciLo)}, ${r2(s.ciHi)}] | ${r2(s.completion)} | ${r2(s.path)} | ${r2(s.state)} | ${r2(s.safety)} | ${Math.round(s.gatedPct)}% | ${money} | ${s.succPerMtok == null ? '—' : Math.round(s.succPerMtok)} |`);
 }
+if (totalTimeouts) md.push('');
+if (totalTimeouts) md.push(`_**TO** = cells that exceeded their \`wall_timeout_s\` (killed before finishing) — ${totalTimeouts} total, excluded from scores and reported as a cost/latency finding. Harnesses that exhaust all retries on a task they can't solve hit this; see the writeup._`);
 md.push('');
 md.push('_Seed: **pin** = adapter pinned the RNG seed (reproducible); **smpl** = the N seeds are independent samples (the adapter has no seed knob), so the CI reflects run-to-run variance, not a reproducible seed. **smpl⚠** = multi-seed cell with **zero** variance and no seed pin — its tight CI is an artifact (likely a deterministic/greedy harness), not evidence of stability._');
 md.push('');
@@ -178,7 +160,7 @@ const MODES = ['contract_format', 'tool_recovery', 'evidence_grounding', 'artifa
 md.push('| Harness | passes | ' + MODES.join(' | ') + ' |');
 md.push('|---|--:|' + MODES.map(() => '--:').join('|') + '|');
 for (const a of adapters) {
-  const rs = rows.filter(r => r.adapter === a);
+  const rs = rows.filter(r => r.adapter === a && !r.timed_out);
   const passes = rs.filter(r => r.result === 'passed').length;
   const counts = MODES.map(mode => rs.filter(r => r.failure_mode === mode).length);
   md.push(`| ${a} | ${passes}/${rs.length} | ${counts.join(' | ')} |`);

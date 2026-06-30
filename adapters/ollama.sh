@@ -31,6 +31,13 @@ MODEL="${OLLAMA_MODEL:-qwen3:8b}"
 HOST="${OLLAMA_HOST:-http://localhost:11434}"
 TEMP="${OLLAMA_TEMPERATURE:-0}"
 SEED="${OLLAMA_SEED:-}"                 # Crucible sets this per-run so seeds give variance (P9)
+# Cap generation per call. Honor the task's MAX_TOKENS budget when it is smaller than the
+# anti-runaway ceiling (4096); otherwise use 4096 — a confused model on an impossible task would
+# otherwise ramble for tens of thousands of tokens (minutes/iter). loop.sh separately enforces
+# the CUMULATIVE token budget across iterations.
+_NP_DEFAULT=4096
+if [ "${MAX_TOKENS:-0}" -gt 0 ] && [ "${MAX_TOKENS:-0}" -lt "$_NP_DEFAULT" ]; then _NP_DEFAULT="$MAX_TOKENS"; fi
+NUM_PREDICT="${OLLAMA_NUM_PREDICT:-$_NP_DEFAULT}"
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
 FB=""; [ -s "$FEEDBACK" ] && FB="$(cat "$FEEDBACK")"
@@ -74,9 +81,9 @@ Return the corrected file(s)."
 fi
 
 RESP="$(curl -s "$HOST/api/generate" -d "$(jq -n \
-  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" --argjson s "${SEED:-null}" \
+  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" --argjson s "${SEED:-null}" --argjson np "$NUM_PREDICT" \
   '{model:$m, prompt:$p, stream:false, think:false,
-    options:({temperature:$t} + (if $s==null then {} else {seed:$s} end))}')")"
+    options:({temperature:$t, num_predict:$np} + (if $s==null then {} else {seed:$s} end))}')")"
 
 TEXT="$(printf '%s' "$RESP" | jq -r '.response // empty')"
 
