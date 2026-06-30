@@ -42,6 +42,18 @@
       "positioning": "batteries-included frontier harness: multi-file autonomy, sub-agents, GitHub PR review; the reference the others are measured against",
       "system_prompt_tokens": "~14.3k (sourced)", "tools": "many (Read/Edit/Write/Bash/Task/…)", "offline": false,
       "headless": "claude -p"
+    },
+    "codex": {
+      "name": "Codex CLI", "creator": "OpenAI", "language": "Rust",
+      "positioning": "tool-calling coding agent run on a LOCAL model (--oss --local-provider ollama); depends on the model emitting well-formed tool calls — weak local models can't, a real model–harness-fit finding",
+      "system_prompt_tokens": "~mid", "tools": "read/edit/shell (sandboxed)", "offline": true,
+      "headless": "codex exec --oss --local-provider ollama"
+    },
+    "aider": {
+      "name": "aider", "creator": "Paul Gauthier", "language": "Python",
+      "positioning": "the most widely-used OSS pair-programmer; edit/diff-block based (no structured tool calls), so it drives weak local models well; metered via OLLAMA_API_BASE",
+      "system_prompt_tokens": "~mid", "tools": "edit/diff blocks over added files", "offline": true,
+      "headless": "aider --message (ollama_chat/<model>)"
     }
   }
 }
