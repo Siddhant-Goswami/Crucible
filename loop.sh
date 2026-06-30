@@ -84,13 +84,17 @@ if [ -n "$CRUCIBLE" ]; then
     --tokens "$TOK_PROXY" --events "$WORK/.proxy_events.jsonl" --portfile "$PORTFILE" &
   PROXY_PID=$!
   for _ in $(seq 1 30); do [ -s "$PORTFILE" ] && break; sleep 0.1; done
+  # The model axis MUST hold whether or not the proxy comes up — otherwise a cell silently
+  # runs the adapter's default model while finalize records $HARNESS_MODEL (corrupts the
+  # factorial). So export the model/seed/temp unconditionally; only OLLAMA_HOST differs.
+  export OLLAMA_MODEL="$HARNESS_MODEL" OLLAMA_SEED="$SEED" OLLAMA_TEMPERATURE="$CRUCIBLE_TEMP"
+  export CRUCIBLE HARNESS_MODEL                    # let config-based adapters (hermes) detect + redirect
   if [ -s "$PORTFILE" ]; then
     export OLLAMA_HOST="http://127.0.0.1:$(cat "$PORTFILE")"
-    export OLLAMA_MODEL="$HARNESS_MODEL" OLLAMA_SEED="$SEED" OLLAMA_TEMPERATURE="$CRUCIBLE_TEMP"
-    export CRUCIBLE HARNESS_MODEL                  # let config-based adapters (hermes) detect + redirect
     echo "  crucible: model=$HARNESS_MODEL seed=$SEED budget=${MAX_TOKENS}tok proxy=$OLLAMA_HOST"
   else
-    echo "  crucible: proxy failed to start; continuing without token metering" >&2
+    export OLLAMA_HOST="$OLLAMA_UPSTREAM"          # real server: unmetered, but the correct model
+    echo "  crucible: proxy failed to start; running model=$HARNESS_MODEL WITHOUT token metering" >&2
     kill "$PROXY_PID" 2>/dev/null || true; PROXY_PID=""
   fi
 

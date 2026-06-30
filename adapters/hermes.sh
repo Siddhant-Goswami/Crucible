@@ -32,8 +32,13 @@ command -v hermes >/dev/null 2>&1 || { echo "hermes not installed — see LEARNI
 # verbatim on exit. Sequential runs only (the battery is sequential); the trap guards a crash.
 HCFG="$(hermes config path 2>/dev/null || echo "$HOME/.hermes/config.yaml")"
 if [ -n "${CRUCIBLE:-}" ] && [ -n "${OLLAMA_HOST:-}" ] && [ -f "$HCFG" ]; then
+  # Recover-first: a prior crucible run hard-killed before its restore (SIGKILL/crash) leaves
+  # the live config redirected at a now-dead proxy port, with the TRUE original still in
+  # .crucible-bak. If that backup exists, restore it BEFORE backing up again — otherwise we'd
+  # snapshot the poisoned config as the "original" and cement the corruption permanently.
+  [ -f "$HCFG.crucible-bak" ] && mv -f "$HCFG.crucible-bak" "$HCFG"
   cp "$HCFG" "$HCFG.crucible-bak"
-  trap 'mv -f "$HCFG.crucible-bak" "$HCFG" 2>/dev/null || true' EXIT
+  trap 'mv -f "$HCFG.crucible-bak" "$HCFG" 2>/dev/null || true' EXIT INT TERM
   hermes config set model.base_url "${OLLAMA_HOST%/}/v1" >/dev/null 2>&1 || true
   [ -n "${HARNESS_MODEL:-}" ] && hermes config set model.default "$HARNESS_MODEL" >/dev/null 2>&1 || true
 fi

@@ -8,13 +8,15 @@ Every cell is ≥1 seed; Score carries a 95% bootstrap CI (P9).
 
 ## 1. Capacity scorecard — per (harness, model)
 
-| Harness | Model | n | Score [95% CI] | Completion | Path | State | Safety | gated% | Cost/run | Succ/Mtok |
-|---|---|--:|---|--:|--:|--:|--:|--:|--:|--:|
-| mock | baseline | 2 | **0.5** [0, 1] | 0.5 | 0.5 | 0.5 | 0.93 | 50% | $0 | — |
-| ollama | deepseek-r1:1.5b | 4 | **0.26** [0.02, 0.71] | 0.25 | 0.29 | 0.25 | 1 | 0% | $0 | 47 |
-| ollama | qwen3:8b | 4 | **1** [1, 1] | 1 | 1 | 1 | 1 | 0% | $0 | 1252 |
-| pi | deepseek-r1:1.5b | 4 | **0** [0, 0] | 0 | 0 | 0 | 1 | 0% | $0 | — |
-| pi | qwen3:8b | 4 | **1** [1, 1] | 1 | 1 | 1 | 1 | 0% | $0 | — |
+| Harness | Model | n | Seed | Score [95% CI] | Completion | Path | State | Safety | gated% | Cost/run | Succ/Mtok |
+|---|---|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|
+| mock | baseline | 2 | smpl | **0.5** [0, 1] | 0.5 | 0.5 | 0.5 | 0.93 | 50% | $0 | — |
+| ollama | deepseek-r1:1.5b | 4 | smpl | **0.26** [0.02, 0.7] | 0.25 | 0.29 | 0.25 | 1 | 0% | $0 | 47 |
+| ollama | qwen3:8b | 4 | smpl⚠ | **1** [1, 1] | 1 | 1 | 1 | 1 | 0% | $0 | 1252 |
+| pi | deepseek-r1:1.5b | 4 | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 1 | 0% | $0 | — |
+| pi | qwen3:8b | 4 | smpl⚠ | **1** [1, 1] | 1 | 1 | 1 | 1 | 0% | $0 | — |
+
+_Seed: **pin** = adapter pinned the RNG seed (reproducible); **smpl** = the N seeds are independent samples (the adapter has no seed knob), so the CI reflects run-to-run variance, not a reproducible seed. **smpl⚠** = multi-seed cell with **zero** variance and no seed pin — its tight CI is an artifact (likely a deterministic/greedy harness), not evidence of stability._
 
 ## 2. Cross-model transfer (reach test, P4)
 

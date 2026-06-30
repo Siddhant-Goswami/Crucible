@@ -36,6 +36,19 @@ function parseYaml(text) {
 
   function indentOf(l) { return l.length - l.trimStart().length; }
 
+  // consume consecutive `- item` lines at exactly `indent` (a block list under a key,
+  // which YAML commonly puts at the KEY's own indent rather than deeper).
+  function listAt(indent) {
+    const arr = [];
+    while (pos < lines.length) {
+      const l = lines[pos];
+      if (indentOf(l) !== indent || !l.trim().startsWith('- ')) break;
+      arr.push(scalar(l.trim().slice(2)));
+      pos++;
+    }
+    return arr;
+  }
+
   // parse a block at >= minIndent; returns object or array
   function block(minIndent) {
     // decide array vs object by first line
@@ -57,9 +70,11 @@ function parseYaml(text) {
         const rest = body.slice(ci + 1).trim();
         pos++;
         if (rest === '') {
-          // nested block — look at next line's indent
+          // nested block — a deeper-indented map/list, OR a block list at this same indent.
           const next = lines[pos];
-          if (next && indentOf(next) > minIndent) out[key] = block(indentOf(next));
+          const nextInd = next ? indentOf(next) : -1;
+          if (next && nextInd > minIndent) out[key] = block(nextInd);
+          else if (next && nextInd === minIndent && next.trim().startsWith('- ')) out[key] = listAt(minIndent);
           else out[key] = null;
         } else {
           out[key] = scalar(rest);

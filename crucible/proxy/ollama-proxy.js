@@ -89,8 +89,13 @@ const server = http.createServer((creq, cres) => {
     const meter = /\/(api|v1)\//.test(creq.url || '');   // Ollama-native or OpenAI-compat
     ures.on('data', d => { cres.write(d); if (meter) chunks.push(d); });
     ures.on('end', () => { cres.end(); if (meter && chunks.length) record(parseTokens(Buffer.concat(chunks))); });
+    // a mid-stream upstream reset (Ollama restart/OOM) must not crash the proxy
+    ures.on('error', () => { try { cres.end(); } catch {} });
   });
-  ureq.on('error', e => { cres.writeHead(502); cres.end('crucible-proxy upstream error: ' + e.message); });
+  ureq.on('error', e => { if (!cres.headersSent) cres.writeHead(502); try { cres.end('crucible-proxy upstream error: ' + e.message); } catch {} });
+  // client disconnects / socket errors are non-fatal to the proxy
+  creq.on('error', () => {});
+  cres.on('error', () => {});
   creq.pipe(ureq);
 });
 

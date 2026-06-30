@@ -81,6 +81,9 @@ function agg(runs) {
     tokens: tok, cost,
     succPerMtok: tok ? (succ.length / (tok / 1e6)) : null,
     wall: mean(f('wall_ms')),
+    seeded: runs.some(r => r.seeded),                              // adapter pinned the RNG seed
+    multiSeed: new Set(runs.map(r => r.seed)).size > 1,
+    zeroVar: scores.length > 1 && Math.max(...scores) - Math.min(...scores) === 0,
   };
 }
 
@@ -98,13 +101,19 @@ md.push('');
 // 1. Scorecard
 md.push('## 1. Capacity scorecard — per (harness, model)');
 md.push('');
-md.push('| Harness | Model | n | Score [95% CI] | Completion | Path | State | Safety | gated% | Cost/run | Succ/Mtok |');
-md.push('|---|---|--:|---|--:|--:|--:|--:|--:|--:|--:|');
+md.push('| Harness | Model | n | Seed | Score [95% CI] | Completion | Path | State | Safety | gated% | Cost/run | Succ/Mtok |');
+md.push('|---|---|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|');
+const fakeCI = [];   // unseeded, multi-seed, zero-variance cells — their tight CI is not real
 for (const k of Object.keys(cells).sort()) {
   const c = cells[k]; const s = agg(c.runs);
   const money = s.cost === 0 ? '$0' : '$' + s.cost.toFixed(4);
-  md.push(`| ${c.adapter} | ${c.model} | ${s.n} | **${r2(s.score)}** [${r2(s.ciLo)}, ${r2(s.ciHi)}] | ${r2(s.completion)} | ${r2(s.path)} | ${r2(s.state)} | ${r2(s.safety)} | ${Math.round(s.gatedPct)}% | ${money} | ${s.succPerMtok == null ? '—' : Math.round(s.succPerMtok)} |`);
+  const suspect = s.multiSeed && s.zeroVar && !s.seeded;
+  if (suspect) fakeCI.push(`${c.adapter} @ ${c.model}`);
+  const seedCell = s.seeded ? 'pin' : (suspect ? 'smpl⚠' : 'smpl');
+  md.push(`| ${c.adapter} | ${c.model} | ${s.n} | ${seedCell} | **${r2(s.score)}** [${r2(s.ciLo)}, ${r2(s.ciHi)}] | ${r2(s.completion)} | ${r2(s.path)} | ${r2(s.state)} | ${r2(s.safety)} | ${Math.round(s.gatedPct)}% | ${money} | ${s.succPerMtok == null ? '—' : Math.round(s.succPerMtok)} |`);
 }
+md.push('');
+md.push('_Seed: **pin** = adapter pinned the RNG seed (reproducible); **smpl** = the N seeds are independent samples (the adapter has no seed knob), so the CI reflects run-to-run variance, not a reproducible seed. **smpl⚠** = multi-seed cell with **zero** variance and no seed pin — its tight CI is an artifact (likely a deterministic/greedy harness), not evidence of stability._');
 md.push('');
 
 // 2. Cross-model transfer / rank stability

@@ -88,6 +88,10 @@ PREV_IN=0; PREV_OUT=0
 if [ -f "$WORK/.tokens" ]; then read -r PREV_IN PREV_OUT < "$WORK/.tokens"; fi
 echo "$(( PREV_IN + IN )) $(( PREV_OUT + OUT ))" > "$WORK/.tokens"
 
+# Mark the run as seed-controlled so finalize can record seeded=true (P9). Only adapters
+# that actually pin the RNG seed drop this; others' multi-seed cells are independent samples.
+[ -n "$SEED" ] && : > "$WORK/.seeded"
+
 # --- apply the model's file blocks (robust parse + sandbox guard) -------------
 printf '%s' "$TEXT" | node -e '
   const fs = require("fs"), path = require("path");
