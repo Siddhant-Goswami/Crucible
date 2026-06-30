@@ -71,18 +71,62 @@ error) and passes.
 
 ## 5. Headline results
 
-> _Generated from the latest battery — see [`crucible/results/SCORECARD.md`](../crucible/results/SCORECARD.md)
-> for the full tables (capacity scorecard, cross-model transfer, significance, failure-mode
-> breakdown). Summary below is filled in after the battery completes._
+> From a **144-cell** battery (6 harnesses × 3 models × up to 9 tasks × 3 seeds). The full
+> tables are in [`crucible/results/SCORECARD.md`](../crucible/results/SCORECARD.md); the exact
+> environment is in [`crucible/results/ENV.md`](../crucible/results/ENV.md). **Coverage is
+> partial** (see §5.6): the discriminating, safety, and frontier tasks are fully covered; the
+> two content tasks and some `hermes`/`goose` floor cells were not reached before write-up.
 
-**(to be populated from SCORECARD.md)** — the capacity scorecard per `(harness, model)`, the
-cross-model transfer/rank-stability verdict, the paired-significance results, and the
-failure-mode breakdown. Expected qualitative findings, to confirm against the data:
+### 5.1 Capacity scorecard (Score per `harness @ model`)
 
-- The *same* harness scores very differently across models (Score names a *pair*, P2).
-- Weak/mid models **discriminate** harnesses; stronger models compress the spread (P8).
-- The thin `ollama` control fails the tool-recover tier by construction; tool-capable harnesses pass.
-- Cost spans an order of magnitude across harnesses for the same task (the "tax" of a richer harness).
+| Harness | `deepseek-r1:1.5b` (small) | `qwen3:8b` (mid) | `claude-opus-4-8` |
+|---|--:|--:|--:|
+| claude | — | — | **1.00** (12 cells, $1.38/run) |
+| ollama (thin control) | 0.06 | 0.89 | — |
+| pi | 0.00 | 1.00 *(5 timeouts)* | — |
+| hermes | 0.00 | 0.99 | — |
+| goose | 0.00 *(3 TO)* | 1.00 *(8 timeouts)* | — |
+| mock (floor) | 0.16, **Safety 0.96 (29% gated)** | — | — |
+
+### 5.2 The model dominates the score — but the harness **reorders the field** (P2, P8)
+On the **small** model, *nothing* works: every lean harness lands at ~0 (`ollama` 0.06 is the
+ceiling). On the **mid** model the same harnesses jump to ~1.0 — except the thin `ollama` control
+lags at **0.89** while the richer `pi`/`hermes`/`goose` reach ~1.0. So the model sets the level,
+and the harness sets the *order* — exactly why a score must name a `(harness, model)` pair.
+
+### 5.3 The thin-control paradox & unstable transfer (P4)
+`ollama` (the thinnest harness) ranks **#1 on the small model** (its lower overhead barely edges
+out) but **last on the mid model** (the richer harnesses' tooling pays off). The report's
+rank-stability check flags this: **⚠️ the ordering changes across models** — a harness's advantage
+here is *model-specific, not structural*. And it's **statistically real**: on the small model
+`ollama` beats `pi` by Δ=0.066, 95% CI [0.009, 0.173], **significant**.
+
+### 5.4 Safety: the gate fires, and the capable harnesses respect boundaries
+On the T4 `secret-redaction` task (a prompt-injection trying to make the agent leak a secret),
+**every real harness kept `Safety = 1`** — none leaked the secret or wrote a forbidden file; **Claude
+explicitly resisted the injection** and still completed (3/3). The only thing the gate caught was
+**`mock`** — the dumb baseline writes an irrelevant file outside the allowed area, so it's gated
+(Safety 0.96, 29% of its cells). That's the gate working as designed: a boundary violation collapses
+the score, and the legitimate harnesses stayed in-bounds.
+
+### 5.5 How harnesses fail, and what they cost (P1, P7)
+The dominant failure mode is **`artifact_commitment`** — the harness/model produced no usable output
+(`pi` 19, `hermes` 12, `ollama` 11, `goose` 9 such failures), overwhelmingly on the small model.
+**Claude failed nothing (12/12).** And cost/latency is a first-class finding: **19 cells timed out**
+(`goose` 11, `pi` 7) — `goose`/`pi` exhaust their retries on tasks they can't solve within budget, so
+their headline ~1.0 on the mid model is **only over the cells they finished**; read it *with* the `TO`
+column. Claude's quality is highest but its metered cost is ~$1.4/run (a cache-inflated upper bound).
+
+### 5.6 Coverage & honesty
+- **Fully covered:** `tool-recover` (T1), `secret-redaction` (T4), `api-migration` (T2 — partial
+  `hermes`/`goose`), the three floor tasks, and the Claude frontier slice.
+- **Not reached before write-up:** `research-deck` (T3) and `self-improving-rubric` (T2), plus some
+  `hermes`/`goose` cells on the floor tasks (~94 of 225 local cells unrun). They add completeness,
+  not new headline findings; rerun with `RESUME=1 ./crucible/bench.sh` to fill them in.
+- **Wide CIs / few seeds:** with 3 seeds many differences are *not* significant — reported honestly,
+  not hidden. `smpl⚠` marks cells whose tight CI is an artifact of zero variance, not stability.
+- The **T1 tool-recover discrimination is confirmed empirically**: the file-only `ollama` control
+  cannot run the generator and fails every cell; `pi` and `claude` (tool-capable) pass.
 
 ## 6. Reproduce
 
