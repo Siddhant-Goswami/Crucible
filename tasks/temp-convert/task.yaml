@@ -1,0 +1,12 @@
+id: temp-convert
+tier: T2
+domain: software-engineering
+capability_tags: [multi-file, refactor, state]
+budgets:
+  max_iters: 5
+  max_tokens: 100000
+  wall_timeout_s: 400
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

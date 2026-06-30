@@ -30,6 +30,7 @@ WORK="$1"; ITER="$2"; FEEDBACK="$3"
 MODEL="${OLLAMA_MODEL:-qwen3:8b}"
 HOST="${OLLAMA_HOST:-http://localhost:11434}"
 TEMP="${OLLAMA_TEMPERATURE:-0}"
+SEED="${OLLAMA_SEED:-}"                 # Crucible sets this per-run so seeds give variance (P9)
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
 FB=""; [ -s "$FEEDBACK" ] && FB="$(cat "$FEEDBACK")"
@@ -73,8 +74,9 @@ Return the corrected file(s)."
 fi
 
 RESP="$(curl -s "$HOST/api/generate" -d "$(jq -n \
-  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" \
-  '{model:$m, prompt:$p, stream:false, think:false, options:{temperature:$t}}')")"
+  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" --argjson s "${SEED:-null}" \
+  '{model:$m, prompt:$p, stream:false, think:false,
+    options:({temperature:$t} + (if $s==null then {} else {seed:$s} end))}')")"
 
 TEXT="$(printf '%s' "$RESP" | jq -r '.response // empty')"
 
@@ -85,6 +87,10 @@ OUT="$(printf '%s' "$RESP" | jq -r '.eval_count // 0')"
 PREV_IN=0; PREV_OUT=0
 if [ -f "$WORK/.tokens" ]; then read -r PREV_IN PREV_OUT < "$WORK/.tokens"; fi
 echo "$(( PREV_IN + IN )) $(( PREV_OUT + OUT ))" > "$WORK/.tokens"
+
+# Mark the run as seed-controlled so finalize can record seeded=true (P9). Only adapters
+# that actually pin the RNG seed drop this; others' multi-seed cells are independent samples.
+[ -n "$SEED" ] && : > "$WORK/.seeded"
 
 # --- apply the model's file blocks (robust parse + sandbox guard) -------------
 printf '%s' "$TEXT" | node -e '

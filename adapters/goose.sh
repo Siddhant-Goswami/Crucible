@@ -17,7 +17,9 @@
 set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 export GOOSE_PROVIDER="${GOOSE_PROVIDER:-ollama}"
-export GOOSE_MODEL="${GOOSE_MODEL:-qwen3:8b}"
+# Honor the Crucible model axis (HARNESS_MODEL). OLLAMA_HOST is inherited from loop.sh —
+# in crucible mode it points at the token-logging proxy, so goose is metered automatically.
+export GOOSE_MODEL="${GOOSE_MODEL:-${HARNESS_MODEL:-qwen3:8b}}"
 export OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 export GOOSE_MODE="${GOOSE_MODE:-auto}"   # auto-approve tools; never hang headless
 WORK="$1"; FEEDBACK="$3"

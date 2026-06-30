@@ -1,0 +1,12 @@
+id: roman-numerals
+tier: T0
+domain: software-engineering
+capability_tags: [bug-fix, single-file]
+budgets:
+  max_iters: 4
+  max_tokens: 70000
+  wall_timeout_s: 300
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

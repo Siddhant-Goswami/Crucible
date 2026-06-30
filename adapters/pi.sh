@@ -18,8 +18,24 @@
 set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 WORK="$1"; FEEDBACK="$3"
-MODEL="${PI_MODEL:-ollama/qwen3:8b}"
+# Honor the Crucible model axis (HARNESS_MODEL) so pi runs on the same model as the other
+# harnesses; falls back to PI_MODEL / qwen3:8b.
+MODEL="${PI_MODEL:-ollama/${HARNESS_MODEL:-qwen3:8b}}"
 command -v pi >/dev/null 2>&1 || { echo "pi not installed (npm i -g @mariozechner/pi-coding-agent)" >&2; exit 1; }
+
+# Crucible: pi reaches Ollama via its own config baseUrl (~/.pi/agent/models.json), so to
+# meter its tokens we temporarily point that provider's baseUrl at the Crucible proxy
+# (OLLAMA_HOST, OpenAI-compat /v1) and restore the file verbatim on exit. Recover-first guards
+# against a prior hard-killed run leaving the config (and its backup) corrupted.
+PICFG="$HOME/.pi/agent/models.json"
+if [ -n "${CRUCIBLE:-}" ] && [ -n "${OLLAMA_HOST:-}" ] && [ -f "$PICFG" ]; then
+  [ -f "$PICFG.crucible-bak" ] && mv -f "$PICFG.crucible-bak" "$PICFG"
+  cp "$PICFG" "$PICFG.crucible-bak"
+  trap 'mv -f "$PICFG.crucible-bak" "$PICFG" 2>/dev/null || true' EXIT INT TERM
+  node -e 'const fs=require("fs"),f=process.argv[1];const c=JSON.parse(fs.readFileSync(f,"utf8"));
+    if (c.providers && c.providers.ollama) c.providers.ollama.baseUrl = process.argv[2];
+    fs.writeFileSync(f, JSON.stringify(c, null, 1));' "$PICFG" "${OLLAMA_HOST%/}/v1" 2>/dev/null || true
+fi
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
 FB=""
