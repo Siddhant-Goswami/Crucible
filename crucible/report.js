@@ -21,39 +21,9 @@ const rows = fs.readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean).map(JSO
 if (!rows.length) { console.error('empty ledger: ' + LEDGER); process.exit(1); }
 
 // ---- helpers -----------------------------------------------------------------
-const mean = a => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
+const { mean, bootCI, pairedBoot, priceRun } = require('./lib/stats');
 const r2 = x => Math.round(x * 100) / 100;
 const r3 = x => Math.round(x * 1000) / 1000;
-function bootCI(arr, B = 2000) {
-  if (arr.length < 2) return [arr[0] ?? 0, arr[0] ?? 0];
-  const ms = [];
-  for (let b = 0; b < B; b++) {
-    let s = 0; for (let i = 0; i < arr.length; i++) s += arr[Math.floor(Math.random() * arr.length)];
-    ms.push(s / arr.length);
-  }
-  ms.sort((x, y) => x - y);
-  return [ms[Math.floor(0.025 * B)], ms[Math.floor(0.975 * B)]];
-}
-// paired bootstrap on per-seed differences: returns {diff, lo, hi, sig}
-function pairedBoot(aBySeed, bBySeed, B = 2000) {
-  const seeds = Object.keys(aBySeed).filter(s => s in bBySeed);
-  const diffs = seeds.map(s => aBySeed[s] - bBySeed[s]);
-  if (diffs.length < 2) return { diff: mean(diffs), lo: NaN, hi: NaN, sig: false, n: diffs.length };
-  const ms = [];
-  for (let b = 0; b < B; b++) {
-    let s = 0; for (let i = 0; i < diffs.length; i++) s += diffs[Math.floor(Math.random() * diffs.length)];
-    ms.push(s / diffs.length);
-  }
-  ms.sort((x, y) => x - y);
-  const lo = ms[Math.floor(0.025 * B)], hi = ms[Math.floor(0.975 * B)];
-  return { diff: mean(diffs), lo, hi, sig: lo > 0 || hi < 0, n: diffs.length };
-}
-function priceRun(r) {
-  let key = r.model && r.model.startsWith('claude') ? r.model
-    : (r.model && r.model !== 'baseline' ? 'ollama/' + r.model : 'ollama/qwen3:8b');
-  const p = pricing.models[key] || { in: 0, out: 0 };
-  return ((r.tokens_in || 0) * p.in + (r.tokens_out || 0) * p.out) / 1e6;
-}
 
 // ---- group by (adapter, model) ----------------------------------------------
 const cellKey = r => r.adapter + ' @ ' + r.model;
@@ -71,7 +41,7 @@ function agg(runs) {
   const ci = bootCI(scores);
   const succ = runs.filter(r => r.result === 'passed');
   const tok = runs.reduce((s, r) => s + (r.tokens_in || 0) + (r.tokens_out || 0), 0);
-  const cost = runs.reduce((s, r) => s + priceRun(r), 0);
+  const cost = runs.reduce((s, r) => s + priceRun(r, pricing), 0);
   return {
     n: runs.length,
     score: mean(scores), ciLo: ci[0], ciHi: ci[1],
