@@ -13,6 +13,9 @@ output-only, single-run, model-entangled scoring cannot tell you whether a harne
 > can implement against any harness. This directory is the **reference implementation** that
 > proves the spec on `nemo-claw`'s adapters. Every metric is justified against a first
 > principle (P1–P9) and a source paper in [`RATIONALE.md`](./RATIONALE.md).
+>
+> **Results & methodology writeup → [`../docs/crucible-results.md`](../docs/crucible-results.md)** —
+> the headline battery, the harness/model panel, and how to reproduce it.
 
 ## What it measures
 
