@@ -169,12 +169,13 @@ Reporting Score without Cost, or Cost without Score, is non-conformant.
 ## 5. Metering & audit (reference mechanisms)
 
 - **Tokens (P7).** The runner starts an **ephemeral token-logging proxy** in front of the
-  local model server per run; the adapter's `OLLAMA_HOST` points at it. The proxy records
-  exact `prompt_eval_count`/`eval_count` per request → per-iteration token counts in the
-  trace and an authoritative per-run total. This closes the gap where harnesses driving the
-  model through their own runtime never surface tokens to the loop. Cloud harnesses report
-  tokens from their own usage output. *Blind spot:* harnesses calling a non-proxied API
-  endpoint must add their own hook — documented, not hidden.
+  local model server per run. It meters both Ollama-native (`/api/*`,
+  `prompt_eval_count`/`eval_count`) and OpenAI-compatible (`/v1/*`, `usage.*`) traffic →
+  per-iteration token counts in the trace and an authoritative per-run total. Harnesses are
+  routed at it by env (`ollama`, `goose` via `OLLAMA_HOST`) or by a per-run config redirect
+  restored on exit (`hermes`'s `base_url`); cloud harnesses report tokens from their own usage.
+  *Blind spot:* a harness with a non-redirectable endpoint (`pi`, `openclaw` here) reports `0`
+  until wired — shown as `—`, documented, not hidden.
 - **Safety audit (P6).** Per iteration: a workdir **file snapshot diff** (writes/creates vs
   `allow/forbid_globs`), a **secret-leak scan** (any `info_flow.secrets` content appearing
   in written files or adapter stdout), and a **command log** via shimmed wrappers on `PATH`

@@ -87,6 +87,7 @@ if [ -n "$CRUCIBLE" ]; then
   if [ -s "$PORTFILE" ]; then
     export OLLAMA_HOST="http://127.0.0.1:$(cat "$PORTFILE")"
     export OLLAMA_MODEL="$HARNESS_MODEL" OLLAMA_SEED="$SEED" OLLAMA_TEMPERATURE="$CRUCIBLE_TEMP"
+    export CRUCIBLE HARNESS_MODEL                  # let config-based adapters (hermes) detect + redirect
     echo "  crucible: model=$HARNESS_MODEL seed=$SEED budget=${MAX_TOKENS}tok proxy=$OLLAMA_HOST"
   else
     echo "  crucible: proxy failed to start; continuing without token metering" >&2

@@ -26,6 +26,18 @@ export PATH="$HOME/.hermes/bin:$HOME/.local/bin:$PATH"
 WORK="$1"; FEEDBACK="$3"
 command -v hermes >/dev/null 2>&1 || { echo "hermes not installed — see LEARNINGS.md §6" >&2; exit 1; }
 
+# Crucible: hermes reads model.base_url/model.default from its config.yaml (not env), so to
+# meter its tokens we temporarily point base_url at the Crucible proxy (OLLAMA_HOST, OpenAI-
+# compat /v1) and set the model axis via `hermes config set`, then restore the ORIGINAL file
+# verbatim on exit. Sequential runs only (the battery is sequential); the trap guards a crash.
+HCFG="$(hermes config path 2>/dev/null || echo "$HOME/.hermes/config.yaml")"
+if [ -n "${CRUCIBLE:-}" ] && [ -n "${OLLAMA_HOST:-}" ] && [ -f "$HCFG" ]; then
+  cp "$HCFG" "$HCFG.crucible-bak"
+  trap 'mv -f "$HCFG.crucible-bak" "$HCFG" 2>/dev/null || true' EXIT
+  hermes config set model.base_url "${OLLAMA_HOST%/}/v1" >/dev/null 2>&1 || true
+  [ -n "${HARNESS_MODEL:-}" ] && hermes config set model.default "$HARNESS_MODEL" >/dev/null 2>&1 || true
+fi
+
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
 FB=""
 [ -s "$FEEDBACK" ] && FB="The previous attempt FAILED the verifier. Feedback:

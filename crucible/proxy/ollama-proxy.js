@@ -35,25 +35,29 @@ const PORT = parseInt(arg('port', '0'), 10);
 
 let cumIn = 0, cumOut = 0;
 
-// Parse token counts from an Ollama response body. Handles both a single stream:false
-// JSON object and an NDJSON stream (take the last line carrying eval_count).
+// Parse token counts from a response body. Handles BOTH Ollama-native
+// (prompt_eval_count/eval_count) and OpenAI-compatible (usage.prompt_tokens/
+// completion_tokens) shapes, as a single stream:false object, an NDJSON stream, or an
+// SSE stream ("data: {…}"). Takes the last meterable object in a stream.
 function parseTokens(buf) {
   const text = buf.toString('utf8');
   const tryObj = s => { try { return JSON.parse(s); } catch { return null; } };
-  let obj = tryObj(text);
-  if (!obj || obj.eval_count == null) {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const o = tryObj(lines[i]);
-      if (o && (o.eval_count != null || o.prompt_eval_count != null)) { obj = o; break; }
-    }
-  }
-  if (!obj) return null;
-  return {
-    model: obj.model || null,
-    in: obj.prompt_eval_count || 0,
-    out: obj.eval_count || 0,
+  const fromObj = o => {
+    if (!o) return null;
+    if (o.eval_count != null || o.prompt_eval_count != null)              // Ollama native
+      return { model: o.model || null, in: o.prompt_eval_count || 0, out: o.eval_count || 0 };
+    if (o.usage)                                                          // OpenAI-compatible
+      return { model: o.model || null, in: o.usage.prompt_tokens || 0, out: o.usage.completion_tokens || 0 };
+    return null;
   };
+  const whole = fromObj(tryObj(text));
+  if (whole) return whole;
+  const lines = text.split('\n').map(l => l.replace(/^data:\s*/, '').trim()).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const o = fromObj(tryObj(lines[i]));
+    if (o) return o;
+  }
+  return null;
 }
 
 function record(t) {
@@ -82,7 +86,7 @@ const server = http.createServer((creq, cres) => {
   const ureq = http.request(opts, ures => {
     cres.writeHead(ures.statusCode || 502, ures.headers);
     const chunks = [];
-    const meter = /\/api\/(generate|chat|embed)/.test(creq.url || '');
+    const meter = /\/(api|v1)\//.test(creq.url || '');   // Ollama-native or OpenAI-compat
     ures.on('data', d => { cres.write(d); if (meter) chunks.push(d); });
     ures.on('end', () => { cres.end(); if (meter && chunks.length) record(parseTokens(Buffer.concat(chunks))); });
   });
