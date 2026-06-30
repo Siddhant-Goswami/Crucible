@@ -33,9 +33,11 @@ const { computeScore } = require('./lib/score');
   // is enforced separately (audit.js fails closed on trace errors); here we just record the count.
   const { records: trace, errors: traceErrors } = readTrace(a.trace_file);
 
-  // --- tokens (authoritative source: the proxy tally; else sum of per-iter deltas) ----
-  let tokIn = 0, tokOut = 0;
-  try { [tokIn, tokOut] = fs.readFileSync(a.tokens_file, 'utf8').trim().split(/\s+/).map(Number); } catch {}
+  // --- tokens: proxy tally first; then the adapter's own .tokens (cloud harnesses like Claude
+  // bypass the proxy and report usage there); else sum of per-iter trace deltas. ----
+  const readTok = f => { try { const [i, o] = fs.readFileSync(f, 'utf8').trim().split(/\s+/).map(Number); return [i || 0, o || 0]; } catch { return [0, 0]; } };
+  let [tokIn, tokOut] = readTok(a.tokens_file);                         // proxy (ollama/goose/hermes/pi)
+  if (!tokIn && !tokOut) [tokIn, tokOut] = readTok(path.join(a.work, '.tokens'));  // adapter's own (claude)
   if (!tokIn && !tokOut) {
     tokIn = trace.reduce((s, t) => s + (t.tokens_in || 0), 0);
     tokOut = trace.reduce((s, t) => s + (t.tokens_out || 0), 0);
