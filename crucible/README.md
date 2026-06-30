@@ -4,6 +4,9 @@
 principles distilled from the 2026 harness literature in
 [`../docs/harness-first-principles.md`](../docs/harness-first-principles.md).
 
+> 🆕 **New here?** Start with the plain-English [beginner's explainer](../docs/crucible-explainer.md)
+> — what a harness is, what Crucible measures, and how to run it from zero.
+
 A harness is what turns a stateless model into an agent (`Agent = Model + Harness`). Most
 benchmarks score the model's *final answer*; Crucible scores the *harness* by holding the
 model fixed and measuring **the run**. It exists because the literature is unanimous that
