@@ -74,8 +74,12 @@ cell() {  # task_dir name adapter model seed max_iters max_tokens wall_to
   else
     mark="x"
   fi
-  # killed before finalize => no ledger record => count + flag the timeout (not silent)
-  if ! seen "$name" "$a" "$m" "$s"; then timedout=$((timedout+1)); mark="TIMEOUT"; fi
+  # killed before finalize => no ledger record => record a timeout stub (so it's counted + shown,
+  # and a RESUME skips it rather than re-running it to time out again) and flag it.
+  if ! seen "$name" "$a" "$m" "$s"; then
+    timedout=$((timedout+1)); mark="TIMEOUT"
+    node "$ROOT/crucible/lib/timeout-stub.js" "$name" "$a" "$m" "$s" >> "$LEDGER"
+  fi
   pkill -f 'ollama-proxy.js' 2>/dev/null    # reap any orphan proxy before the next cell
   printf '  [%3d] %-7s %-20s %-8s %-18s seed=%s\n' "$total" "$mark" "$name" "$a" "$m" "$s"
 }
