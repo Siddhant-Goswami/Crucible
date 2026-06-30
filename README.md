@@ -17,7 +17,7 @@ the "brain" — and run the *same* task through each on the *same* verifier.
 
 > **Rigorously evaluating harnesses → [`crucible/`](./crucible/README.md).** Crucible is a
 > portable benchmark that scores the *harness* (not the model) on **the run, not the output** —
-> a gated profile `Safety × (Completion + Path + State)`, Cost reported alongside, run as a
+> a gated profile `Safety × (0.6·Completion + 0.2·Path + 0.2·State)`, Cost reported alongside, run as a
 > factorial `harness × model × seed` with variance, significance, and cross-model transfer. It
 > operationalizes the first-principles synthesis in
 > [`docs/harness-first-principles.md`](./docs/harness-first-principles.md).

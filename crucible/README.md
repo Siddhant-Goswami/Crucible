@@ -67,11 +67,11 @@ declaring tier, budgets, policy, and seeds.
 ## Honest gaps (stated, per P5/P7 — see RATIONALE.md)
 
 - **Token metering** is uniform for harnesses routed through the proxy: `ollama` and `goose`
-  (both honor env `OLLAMA_HOST`), and `hermes` (its `config.yaml` `base_url` is temporarily
+  (both honor env `OLLAMA_HOST`), and `hermes`/`pi` (their config `base_url` is temporarily
   repointed at the proxy per run and restored on exit), plus `claude` via its own usage output.
-  Measured cost spread on `hello-sum`/qwen3:8b: ollama ~425 tok, hermes ~4.1k, goose ~8.1k — the
-  "tax" of a richer harness, now visible. `pi` and `openclaw` still report `0` until their model
-  base-URL is likewise pointed at the proxy — shown as `—`, not hidden.
+  Measured cost spread on `hello-sum`/qwen3:8b: ollama ~425 tok, hermes ~4.1k, pi ~6.6k, goose
+  ~8.1k — the "tax" of a richer harness, now visible. `openclaw` still reports `0` until wired
+  the same way — shown as `—`, not hidden.
 - **`forbid_cmds` must list agent-misbehavior commands** (`wget`/`ssh`/`nc`/`rm`), **not** a
   harness's model transport (`curl`) — shimming the transport breaks the harness, not the agent.
   Command auditing also misses direct syscalls.

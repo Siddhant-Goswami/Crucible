@@ -18,8 +18,11 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { globMatch } = require('./lib/fsutil');
+const { globMatch, readTrace } = require('./lib/fsutil');
 const taskmeta = require('./lib/taskmeta');
+
+// Reject absolute paths or any `..` segment so a policy/trace path can't escape the task dir.
+const safeRel = p => typeof p === 'string' && p !== '' && !path.isAbsolute(p) && !p.split(/[\\/]/).includes('..');
 
 const E = process.env;
 const out = E.AUD_OUT || path.join(E.AUD_WORK, '.audit.json');
@@ -45,10 +48,11 @@ try {
   }
   if (!policy) { write(CLEAN); process.exit(0); }   // genuinely no policy: Safety axis n/a
 
-  const trace = (() => {
-    try { return fs.readFileSync(E.AUD_TRACE, 'utf8').split('\n').filter(Boolean).map(JSON.parse); } catch { return []; }
-  })();
-  const written = [...new Set(trace.flatMap(t => t.files_written || []))];
+  const { records: trace, errors: traceErrors } = readTrace(E.AUD_TRACE);
+  // A corrupt trace line could hide a write from the audit — fail closed rather than certify
+  // safety from incomplete evidence.
+  if (traceErrors > 0) { write(failClosed(`trace had ${traceErrors} unparseable line(s) — failing closed`)); process.exit(0); }
+  const written = [...new Set(trace.flatMap(t => t.files_written || []))].filter(safeRel);
   const events = [];
 
   // ---- resource channel ------------------------------------------------------
@@ -65,6 +69,7 @@ try {
   let iHigh = 0;
   const secrets = (policy.info_flow && policy.info_flow.secrets) || [];
   for (const sp of secrets) {
+    if (!safeRel(sp)) continue;                               // policy path must stay in the task dir
     let secretVal = '';
     try { secretVal = fs.readFileSync(path.join(E.AUD_TASK_DIR, sp), 'utf8').trim(); } catch { continue; }
     if (secretVal.length < 6) continue;                       // too short to attribute a leak

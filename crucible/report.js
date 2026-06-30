@@ -106,7 +106,7 @@ md.push('|---|---|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|');
 const fakeCI = [];   // unseeded, multi-seed, zero-variance cells — their tight CI is not real
 for (const k of Object.keys(cells).sort()) {
   const c = cells[k]; const s = agg(c.runs);
-  const money = s.cost === 0 ? '$0' : '$' + s.cost.toFixed(4);
+  const money = s.cost === 0 ? '$0' : '$' + (s.cost / s.n).toFixed(4);   // per RUN, not cell total
   const suspect = s.multiSeed && s.zeroVar && !s.seeded;
   if (suspect) fakeCI.push(`${c.adapter} @ ${c.model}`);
   const seedCell = s.seeded ? 'pin' : (suspect ? 'smpl⚠' : 'smpl');
@@ -160,9 +160,10 @@ for (const m of models) {
   if (ranked.length < 2) continue;
   comparisons++;
   const [A, B] = ranked;
+  // Pair by (task, seed) so a multi-task battery doesn't conflate tasks under one seed key.
   const aBySeed = {}, bBySeed = {};
-  (cells[A + ' @ ' + m]?.runs || []).forEach(r => { aBySeed[r.seed] = r.score; });
-  (cells[B + ' @ ' + m]?.runs || []).forEach(r => { bBySeed[r.seed] = r.score; });
+  (cells[A + ' @ ' + m]?.runs || []).forEach(r => { aBySeed[r.task + '|' + r.seed] = r.score; });
+  (cells[B + ' @ ' + m]?.runs || []).forEach(r => { bBySeed[r.task + '|' + r.seed] = r.score; });
   const pb = pairedBoot(aBySeed, bBySeed);
   const ciStr = Number.isNaN(pb.lo) ? '(need ≥2 shared seeds)' : `Δ=${r3(pb.diff)} [${r3(pb.lo)}, ${r3(pb.hi)}]`;
   md.push(`- **${m}:** ${A} vs ${B} — ${ciStr} → ${pb.sig ? '**significant**' : 'not significant'} (n=${pb.n} seeds).`);

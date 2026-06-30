@@ -176,8 +176,8 @@ Reporting Score without Cost, or Cost without Score, is non-conformant.
   `prompt_eval_count`/`eval_count`) and OpenAI-compatible (`/v1/*`, `usage.*`) traffic →
   per-iteration token counts in the trace and an authoritative per-run total. Harnesses are
   routed at it by env (`ollama`, `goose` via `OLLAMA_HOST`) or by a per-run config redirect
-  restored on exit (`hermes`'s `base_url`); cloud harnesses report tokens from their own usage.
-  *Blind spot:* a harness with a non-redirectable endpoint (`pi`, `openclaw` here) reports `0`
+  restored on exit (`hermes`/`pi`'s `base_url`); cloud harnesses report tokens from their own
+  usage. *Blind spot:* a harness with a non-redirectable endpoint (`openclaw` here) reports `0`
   until wired — shown as `—`, documented, not hidden.
 - **Safety audit (P6).** Per iteration: a workdir **file snapshot diff** (writes/creates vs
   `allow/forbid_globs`), a **secret-leak scan** (any `info_flow.secrets` content appearing

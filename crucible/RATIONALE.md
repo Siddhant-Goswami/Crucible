@@ -27,8 +27,8 @@ is better than another* — drop any one of these and a specific failure mode re
 ## Known blind spots (stated, not hidden — itself a P5/P7 requirement)
 
 - **Token metering** covers harnesses routed through the proxy — `ollama`/`goose` (env
-  `OLLAMA_HOST`) and `hermes` (per-run `base_url` redirect, restored on exit) — plus cloud
-  harnesses that emit usage; `pi`/`openclaw` need the same base-URL redirect and report `0` until wired.
+  `OLLAMA_HOST`) and `hermes`/`pi` (per-run `base_url` redirect, restored on exit) — plus cloud
+  harnesses that emit usage; `openclaw` needs the same base-URL redirect and reports `0` until wired.
 - **Command auditing** via PATH shims catches sub-shelled commands, not direct syscalls.
 - **Path/State** use deterministic proxies for genuinely fuzzy quality (e.g. grounding
   depth); these are flagged, never silently judged by an LLM.

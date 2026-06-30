@@ -20,6 +20,7 @@
 // --portfile written (atomically) once the server is listening, so loop.sh learns the port
 'use strict';
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const { URL } = require('url');
 
@@ -75,15 +76,20 @@ function record(t) {
 const server = http.createServer((creq, cres) => {
   if (creq.url === '/__crucible/health') { cres.writeHead(200); cres.end('ok'); return; }
 
+  const isHttps = UPSTREAM.protocol === 'https:';
+  // Strip accept-encoding so the upstream returns identity-encoded bodies — otherwise a
+  // gzip/deflate response would be parsed as raw UTF-8 and yield no token counts.
+  const headers = { ...creq.headers, host: UPSTREAM.host };
+  delete headers['accept-encoding'];
   const opts = {
     protocol: UPSTREAM.protocol,
     hostname: UPSTREAM.hostname,
-    port: UPSTREAM.port || 11434,
+    port: UPSTREAM.port || (isHttps ? 443 : 11434),
     method: creq.method,
     path: creq.url,
-    headers: { ...creq.headers, host: UPSTREAM.host },
+    headers,
   };
-  const ureq = http.request(opts, ures => {
+  const ureq = (isHttps ? https : http).request(opts, ures => {
     cres.writeHead(ures.statusCode || 502, ures.headers);
     const chunks = [];
     const meter = /\/(api|v1)\//.test(creq.url || '');   // Ollama-native or OpenAI-compat

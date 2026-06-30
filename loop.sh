@@ -72,7 +72,7 @@ FEEDBACK="$WORK/.feedback"
 
 # --- Crucible: start the ephemeral token-logging proxy + init the trace ---------
 PROXY_PID=""; TRACE="$WORK/trace.jsonl"; SNAP="$WORK/.snap"; TOK_PROXY="$WORK/.tokens.proxy"
-budget_exhausted=0; prev_in=0; prev_out=0
+budget_exhausted=0; prev_in=0; prev_out=0; CRUCIBLE_SHIM_PATH=""
 if [ -n "$CRUCIBLE" ]; then
   : > "$TRACE"; : > "$TOK_PROXY"
   # seed the snapshot from the PRISTINE workdir so pre-existing fixtures are not
@@ -115,7 +115,7 @@ if [ -n "$CRUCIBLE" ]; then
         echo 'exit 1'; } > "$SHIMS/$c"
       chmod +x "$SHIMS/$c"
     done
-    export PATH="$SHIMS:$PATH"
+    CRUCIBLE_SHIM_PATH="$SHIMS:"        # applied ONLY to the adapter step (below), not verify/node
   fi
 fi
 
@@ -155,7 +155,7 @@ for ((iter=1; iter<=MAX_ITERS; iter++)); do
 
   # ---- ACT: hand the attempt to the swappable harness ----------------------
   a0="$(now_ms)"
-  if ! bash "$ADAPTER_SH" "$WORK" "$iter" "$FEEDBACK"; then
+  if ! PATH="${CRUCIBLE_SHIM_PATH}$PATH" bash "$ADAPTER_SH" "$WORK" "$iter" "$FEEDBACK"; then
     echo "  [iter $iter] adapter '$ADAPTER' returned nonzero (continuing to verify anyway)" >&2
   fi
   a1="$(now_ms)"

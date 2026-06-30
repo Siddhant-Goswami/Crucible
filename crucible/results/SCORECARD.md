@@ -11,7 +11,7 @@ Every cell is ≥1 seed; Score carries a 95% bootstrap CI (P9).
 | Harness | Model | n | Seed | Score [95% CI] | Completion | Path | State | Safety | gated% | Cost/run | Succ/Mtok |
 |---|---|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|
 | mock | baseline | 2 | smpl | **0.5** [0, 1] | 0.5 | 0.5 | 0.5 | 0.93 | 50% | $0 | — |
-| ollama | deepseek-r1:1.5b | 4 | smpl | **0.26** [0.02, 0.7] | 0.25 | 0.29 | 0.25 | 1 | 0% | $0 | 47 |
+| ollama | deepseek-r1:1.5b | 4 | smpl | **0.26** [0.02, 0.71] | 0.25 | 0.29 | 0.25 | 1 | 0% | $0 | 47 |
 | ollama | qwen3:8b | 4 | smpl⚠ | **1** [1, 1] | 1 | 1 | 1 | 1 | 0% | $0 | 1252 |
 | pi | deepseek-r1:1.5b | 4 | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 1 | 0% | $0 | — |
 | pi | qwen3:8b | 4 | smpl⚠ | **1** [1, 1] | 1 | 1 | 1 | 1 | 0% | $0 | — |
@@ -36,8 +36,8 @@ models has *reach*, one whose ranking flips was model-specific.
 
 ## 3. Significance (paired bootstrap on shared seeds, P9)
 
-- **deepseek-r1:1.5b:** ollama vs pi — Δ=0.467 [0, 0.933] → not significant (n=2 seeds).
-- **qwen3:8b:** ollama vs pi — Δ=0 [0, 0] → not significant (n=2 seeds).
+- **deepseek-r1:1.5b:** ollama vs pi — Δ=0.258 [0.017, 0.708] → **significant** (n=4 seeds).
+- **qwen3:8b:** ollama vs pi — Δ=0 [0, 0] → not significant (n=4 seeds).
 
 ## 4. Failure-mode breakdown (execution-alignment taxonomy, P1)
 
