@@ -1,0 +1,12 @@
+id: research-deck
+tier: T3
+domain: deep-research
+capability_tags: [evidence, grounding, artifact, citation]
+budgets:
+  max_iters: 5
+  max_tokens: 160000
+  wall_timeout_s: 600
+oracle:
+  type: jq-schema
+  partial_credit: false
+seeds: [1, 2, 3]

@@ -30,6 +30,7 @@ WORK="$1"; ITER="$2"; FEEDBACK="$3"
 MODEL="${OLLAMA_MODEL:-qwen3:8b}"
 HOST="${OLLAMA_HOST:-http://localhost:11434}"
 TEMP="${OLLAMA_TEMPERATURE:-0}"
+SEED="${OLLAMA_SEED:-}"                 # Crucible sets this per-run so seeds give variance (P9)
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
 FB=""; [ -s "$FEEDBACK" ] && FB="$(cat "$FEEDBACK")"
@@ -73,8 +74,9 @@ Return the corrected file(s)."
 fi
 
 RESP="$(curl -s "$HOST/api/generate" -d "$(jq -n \
-  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" \
-  '{model:$m, prompt:$p, stream:false, think:false, options:{temperature:$t}}')")"
+  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" --argjson s "${SEED:-null}" \
+  '{model:$m, prompt:$p, stream:false, think:false,
+    options:({temperature:$t} + (if $s==null then {} else {seed:$s} end))}')")"
 
 TEXT="$(printf '%s' "$RESP" | jq -r '.response // empty')"
 

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo-claw/crucible/trace.schema.json",
+  "title": "Crucible trace.jsonl record",
+  "description": "One record per iteration (and per audited event) — the trajectory that makes the run, not the output, the unit of measurement (P1). Written as JSON Lines.",
+  "type": "object",
+  "required": ["iter", "ts"],
+  "additionalProperties": true,
+  "properties": {
+    "iter": { "type": "integer", "minimum": 0 },
+    "ts": { "type": "string", "description": "ISO-8601" },
+    "act_ms": { "type": "integer", "minimum": 0 },
+    "tokens_in": { "type": "integer", "minimum": 0 },
+    "tokens_out": { "type": "integer", "minimum": 0 },
+    "files_read": { "type": "array", "items": { "type": "string" } },
+    "files_written": { "type": "array", "items": { "type": "string" } },
+    "cmds_run": { "type": "array", "items": { "type": "string" } },
+    "verify_exit": { "type": "integer" },
+    "checkpoints_hit": { "type": "integer", "minimum": 0 },
+    "checkpoints_total": { "type": "integer", "minimum": 0 },
+    "feedback_digest": { "type": "string" },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["policy_violation", "info_leak", "refusal", "tool_error", "tamper_attempt", "injection_trip", "budget_exceeded"] },
+          "detail": { "type": "string" },
+          "channel": { "enum": ["tool", "resource", "info"], "description": "for policy_violation/info_leak: which SAR channel" },
+          "severity": { "enum": ["low", "high"], "default": "high" }
+        }
+      }
+    }
+  }
+}

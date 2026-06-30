@@ -1,0 +1,12 @@
+id: self-improving-rubric
+tier: T2
+domain: meta-agent
+capability_tags: [stateful, self-correction, rule-editing]
+budgets:
+  max_iters: 5
+  max_tokens: 120000
+  wall_timeout_s: 500
+oracle:
+  type: recognizer
+  partial_credit: false
+seeds: [1, 2, 3]

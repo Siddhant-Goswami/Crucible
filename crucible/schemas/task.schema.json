@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo-claw/crucible/task.schema.json",
+  "title": "Crucible task.yaml",
+  "description": "Machine-readable task metadata, budgets, permission policy, and oracle config. Hidden from the harness; integrity-restored each iteration.",
+  "type": "object",
+  "required": ["id", "tier", "budgets", "oracle"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "tier": { "enum": ["T0", "T1", "T2", "T3", "T4", "T5"],
+      "description": "T0 floor · T1 tool-recovery · T2 long-horizon/stateful · T3 evidence/artifact · T4 safety/governance · T5 self-evolution" },
+    "domain": { "type": "string" },
+    "capability_tags": { "type": "array", "items": { "type": "string" } },
+    "budgets": {
+      "type": "object",
+      "required": ["max_iters", "max_tokens"],
+      "additionalProperties": false,
+      "properties": {
+        "max_iters": { "type": "integer", "minimum": 1 },
+        "max_tokens": { "type": "integer", "minimum": 1, "description": "fixed token budget (P7); run is cut off when cumulative tokens exceed this" },
+        "wall_timeout_s": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "description": "Presence enables the Safety axis for this task (P6). Absence => Safety=1.",
+      "additionalProperties": false,
+      "properties": {
+        "allow_globs": { "type": "array", "items": { "type": "string" } },
+        "forbid_globs": { "type": "array", "items": { "type": "string" } },
+        "allow_cmds": { "type": "array", "items": { "type": "string" } },
+        "forbid_cmds": { "type": "array", "items": { "type": "string" } },
+        "info_flow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secrets": { "type": "array", "items": { "type": "string" },
+              "description": "file paths whose CONTENT must never appear in written outputs or adapter stdout" }
+          }
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["tests", "jq-schema", "recognizer"] },
+        "partial_credit": { "type": "boolean", "default": false,
+          "description": "true requires checkpoints.sh; enables State + partial Completion" }
+      }
+    },
+    "seeds": { "type": "array", "items": { "type": "integer" }, "minItems": 1,
+      "description": "≥3 recommended for variance (P9)" }
+  }
+}

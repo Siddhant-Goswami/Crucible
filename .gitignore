@@ -21,3 +21,7 @@ loops/01-grading-loop/review-queue/
 
 # vercel CLI project link
 .vercel
+
+# crucible benchmark — generated battery artifacts (the spec, code, schemas & tasks ARE tracked)
+crucible/results/*.jsonl
+crucible/results/*.log

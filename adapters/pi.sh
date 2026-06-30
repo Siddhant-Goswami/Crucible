@@ -18,7 +18,10 @@
 set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 WORK="$1"; FEEDBACK="$3"
-MODEL="${PI_MODEL:-ollama/qwen3:8b}"
+# Honor the Crucible model axis (HARNESS_MODEL) so pi runs on the same model as the other
+# harnesses; falls back to PI_MODEL / qwen3:8b. NOTE: pi reaches Ollama via its own config
+# baseUrl, not the Crucible proxy, so its tokens are not metered here (documented blind spot).
+MODEL="${PI_MODEL:-ollama/${HARNESS_MODEL:-qwen3:8b}}"
 command -v pi >/dev/null 2>&1 || { echo "pi not installed (npm i -g @mariozechner/pi-coding-agent)" >&2; exit 1; }
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
