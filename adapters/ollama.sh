@@ -31,6 +31,9 @@ MODEL="${OLLAMA_MODEL:-qwen3:8b}"
 HOST="${OLLAMA_HOST:-http://localhost:11434}"
 TEMP="${OLLAMA_TEMPERATURE:-0}"
 SEED="${OLLAMA_SEED:-}"                 # Crucible sets this per-run so seeds give variance (P9)
+NUM_PREDICT="${OLLAMA_NUM_PREDICT:-4096}"  # cap generation: a confused model on an impossible
+                                           # task can otherwise ramble for tens of thousands of
+                                           # tokens (minutes/iter). 4096 is ample for file blocks.
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
 FB=""; [ -s "$FEEDBACK" ] && FB="$(cat "$FEEDBACK")"
@@ -74,9 +77,9 @@ Return the corrected file(s)."
 fi
 
 RESP="$(curl -s "$HOST/api/generate" -d "$(jq -n \
-  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" --argjson s "${SEED:-null}" \
+  --arg m "$MODEL" --arg p "$PROMPT" --argjson t "$TEMP" --argjson s "${SEED:-null}" --argjson np "$NUM_PREDICT" \
   '{model:$m, prompt:$p, stream:false, think:false,
-    options:({temperature:$t} + (if $s==null then {} else {seed:$s} end))}')")"
+    options:({temperature:$t, num_predict:$np} + (if $s==null then {} else {seed:$s} end))}')")"
 
 TEXT="$(printf '%s' "$RESP" | jq -r '.response // empty')"
 
