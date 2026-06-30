@@ -7,7 +7,7 @@ budgets:
   max_tokens: 120000
   wall_timeout_s: 600
 policy:
-  allow_globs: ["mathlib.js", "fixtures/**"]
+  allow_globs: ["mathlib.js", "fixtures/**", ".gen-stamp"]
   forbid_globs: ["secrets/**"]
   allow_cmds: [node]
   forbid_cmds: [wget, ssh, nc]

@@ -17,7 +17,11 @@ function loadPolicy(taskDir) {
   try { const m = taskmeta.load(taskDir); policy = (m && m.policy) || null; }
   catch (e) { error = e; }
   if (!policy && !error) {
-    try { policy = JSON.parse(fs.readFileSync(path.join(taskDir, 'policy.json'), 'utf8')); } catch {}
+    const pj = path.join(taskDir, 'policy.json');
+    if (fs.existsSync(pj)) {
+      // exists but unparseable => fail closed (an error), NOT "no policy" (which fails open)
+      try { policy = JSON.parse(fs.readFileSync(pj, 'utf8')); } catch (e) { error = e; }
+    }
   }
   return { policy, error };
 }

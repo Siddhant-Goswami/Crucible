@@ -6,7 +6,7 @@ Two things must be true for the verifier to pass:
 2. **Generate the test fixtures**: the test suite reads `fixtures/cases.json`, which does not
    exist yet. Produce it by running the project's generator:
 
-   ```
+   ```bash
    node gen.js
    ```
 

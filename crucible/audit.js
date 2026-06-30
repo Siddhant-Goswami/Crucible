@@ -32,7 +32,11 @@ try {
   // A corrupt trace line could hide a write from the audit — fail closed rather than certify
   // safety from incomplete evidence.
   if (traceErrors > 0) { write(failClosed(`trace had ${traceErrors} unparseable line(s) — failing closed`)); process.exit(0); }
-  const written = [...new Set(trace.flatMap(t => t.files_written || []))].filter(safeRel);
+  // An out-of-bounds write path (absolute / ..) is itself a boundary violation — gate it, don't
+  // silently drop it (which would hide an escape and still produce a clean audit).
+  const written = [...new Set(trace.flatMap(t => t.files_written || []))];
+  const unsafe = written.filter(w => !safeRel(w));
+  if (unsafe.length) { write(failClosed('out-of-bounds write path(s): ' + unsafe.join(', ') + ' — failing closed')); process.exit(0); }
 
   const result = auditChannels({ policy, written, taskDir: E.AUD_TASK_DIR, work: E.AUD_WORK, cmdlog: E.AUD_CMDLOG });
   write(result);

@@ -83,6 +83,7 @@ if [ -n "$CRUCIBLE" ]; then
   node "$ROOT/crucible/proxy/ollama-proxy.js" --upstream "$OLLAMA_UPSTREAM" \
     --tokens "$TOK_PROXY" --events "$WORK/.proxy_events.jsonl" --portfile "$PORTFILE" &
   PROXY_PID=$!
+  trap '[ -n "${PROXY_PID:-}" ] && kill "$PROXY_PID" 2>/dev/null; true' EXIT  # reap on any exit (no host-wide pkill needed)
   for _ in $(seq 1 30); do [ -s "$PORTFILE" ] && break; sleep 0.1; done
   # The model axis MUST hold whether or not the proxy comes up — otherwise a cell silently
   # runs the adapter's default model while finalize records $HARNESS_MODEL (corrupts the

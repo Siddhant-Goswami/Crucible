@@ -28,8 +28,8 @@ function pairedBoot(aByKey, bByKey, B = 2000, rng = Math.random) {
 // Marginal $ for a run given pricing.json: local models => $0; claude-* keyed directly,
 // other local models keyed as ollama/<model>.
 function priceRun(r, pricing) {
-  const key = r.model && r.model.startsWith('claude') ? r.model
-    : (r.model && r.model !== 'baseline' ? 'ollama/' + r.model : 'ollama/qwen3:8b');
+  if (!r.model || r.model === 'baseline') return 0;            // floor / local-unknown => $0 (don't alias a real key)
+  const key = r.model.startsWith('claude') ? r.model : 'ollama/' + r.model;
   const p = (pricing.models && pricing.models[key]) || { in: 0, out: 0 };
   return ((r.tokens_in || 0) * p.in + (r.tokens_out || 0) * p.out) / 1e6;
 }

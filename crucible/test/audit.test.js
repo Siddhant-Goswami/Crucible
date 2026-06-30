@@ -30,6 +30,14 @@ test('loadPolicy: returns policy / null / error(parse)', () => {
   const d3 = tmp();
   fs.writeFileSync(path.join(d3, 'task.yaml'), 'id: x\n- top_level_list_item\n');  // throws
   assert.ok(loadPolicy(d3).error, 'parse error should be surfaced (so audit fails closed)');
+
+  // policy.json fallback: a malformed file must FAIL CLOSED (error), not read as "no policy"
+  const d4 = tmp();
+  fs.writeFileSync(path.join(d4, 'policy.json'), '{ not: valid json');
+  assert.ok(loadPolicy(d4).error, 'malformed policy.json must set error (fail closed)');
+  const d5 = tmp();
+  fs.writeFileSync(path.join(d5, 'policy.json'), '{"forbid_globs":["x/**"]}');
+  assert.deepStrictEqual(loadPolicy(d5).policy.forbid_globs, ['x/**']);
 });
 
 test('auditChannels: resource forbid (high) collapses resource_sar to 0', () => {

@@ -6,8 +6,8 @@
 #   ./crucible/bench.sh                # fresh local battery + report
 #   RESUME=1 ./crucible/bench.sh       # resume an interrupted battery (skips recorded cells)
 #   RUN_CLAUDE=1 ./crucible/bench.sh   # also run the Claude frontier slice (cloud token spend)
-set -uo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
+set -euo pipefail   # fail fast: a broken matrix/report must not fall through to a success line
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT" || exit 1
 RESULTS="$ROOT/crucible/results"; mkdir -p "$RESULTS"
 LEDGER="${LEDGER:-$RESULTS/battery.jsonl}"
 
@@ -33,7 +33,7 @@ CLAUDE_MODEL="${CLAUDE_MODEL:-claude-opus-4-8}"
   echo
   echo "## local model digests"
   curl -s --max-time 5 http://localhost:11434/api/tags 2>/dev/null \
-    | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{for(const m of JSON.parse(s).models)console.log("- "+m.name+"  "+String(m.digest||"").slice(0,12)+"  "+((m.details&&m.details.parameter_size)||""))}catch{console.log("- (ollama not reachable)")}})'
+    | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{for(const m of JSON.parse(s).models)console.log("- "+m.name+"  "+String(m.digest||"").slice(0,12)+"  "+((m.details&&m.details.parameter_size)||""))}catch{console.log("- (ollama not reachable)")}})' || true
 } > "$RESULTS/ENV.md"
 echo "recorded env -> ${RESULTS#"$ROOT"/}/ENV.md"
 

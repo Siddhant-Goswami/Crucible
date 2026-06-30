@@ -5,8 +5,8 @@
 # RESUMABLE: RESUME=1 keeps the existing ledger and skips cells already recorded
 #   (key = task|adapter|model|seed) — a long battery survives interruption.
 # BOUNDED:   each cell is killed after the task's budgets.wall_timeout_s so a hung harness can't
-#   stall the run; a timed-out cell is LOGGED (never silently dropped) and left absent so RESUME
-#   retries it.
+#   stall the run; a real timeout is recorded as a stub (counted, and SKIPPED — not re-run — on
+#   RESUME), while a no-record CRASH is surfaced separately (ERR) and left for RESUME to retry.
 #
 # Usage (env):
 #   TASKS="tasks/hello-sum crucible/tasks/tool-recover" ADAPTERS="mock,ollama,pi" \
@@ -47,40 +47,46 @@ seen() {  # task adapter model seed
 }
 
 # portable per-cell watchdog (macOS has no `timeout`): kill loop.sh + its children on overrun.
+# Returns 124 IFF the watchdog actually fired (so cell() can tell a real timeout from a crash);
+# the watchdog's `pkill -P` also reaps the cell's own proxy without a host-wide kill.
 run_timed() {  # secs cmd...
   local secs="$1"; shift
   if [ "${secs:-0}" -le 0 ]; then "$@"; return $?; fi
+  local flag="${TMPDIR:-/tmp}/cru-timeout.$$"; rm -f "$flag"
   "$@" & local pid=$!
   ( sleep "$secs"
     if kill -0 "$pid" 2>/dev/null; then
+      : > "$flag"                                       # mark: the watchdog fired
       pkill -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null
       sleep 2; pkill -9 -P "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
     fi ) & local w=$!
   wait "$pid" 2>/dev/null; local rc=$?
   kill "$w" 2>/dev/null; wait "$w" 2>/dev/null
+  if [ -f "$flag" ]; then rm -f "$flag"; return 124; fi  # 124 = timed out (GNU timeout convention)
   return $rc
 }
 
-total=0; passed=0; skipped=0; timedout=0
+total=0; passed=0; skipped=0; timedout=0; errored=0
 cell() {  # task_dir name adapter model seed max_iters max_tokens wall_to
-  local td="$1" name="$2" a="$3" m="$4" s="$5" mi="$6" mt="$7" wt="$8" mark
+  local td="$1" name="$2" a="$3" m="$4" s="$5" mi="$6" mt="$7" wt="$8" mark rc
   if [ -n "$RESUME" ] && seen "$name" "$a" "$m" "$s"; then
     skipped=$((skipped+1)); printf '  [skip] %-20s %-8s %-18s seed=%s\n' "$name" "$a" "$m" "$s"; return
   fi
   total=$((total+1))
-  if run_timed "$wt" env CRUCIBLE=1 HARNESS_MODEL="$m" SEED="$s" MAX_TOKENS="$mt" CRZ_LEDGER="$LEDGER" \
-       bash "$ROOT/loop.sh" "$td" "$a" "$mi" >/dev/null 2>&1; then
-    passed=$((passed+1)); mark="ok"
-  else
-    mark="x"
-  fi
-  # killed before finalize => no ledger record => record a timeout stub (so it's counted + shown,
-  # and a RESUME skips it rather than re-running it to time out again) and flag it.
-  if ! seen "$name" "$a" "$m" "$s"; then
+  run_timed "$wt" env CRUCIBLE=1 HARNESS_MODEL="$m" SEED="$s" MAX_TOKENS="$mt" CRZ_LEDGER="$LEDGER" \
+    bash "$ROOT/loop.sh" "$td" "$a" "$mi" >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" -eq 124 ]; then
+    # the watchdog fired: record a timeout stub (counted + shown; a RESUME skips it, not re-runs).
     timedout=$((timedout+1)); mark="TIMEOUT"
     node "$ROOT/crucible/lib/timeout-stub.js" "$name" "$a" "$m" "$s" >> "$LEDGER"
+  elif seen "$name" "$a" "$m" "$s"; then
+    if [ "$rc" -eq 0 ]; then passed=$((passed+1)); mark="ok"; else mark="x"; fi
+  else
+    # ran (not a timeout) but wrote no ledger row => crash / setup failure, distinct from a
+    # timeout. Surface it; leave it unrecorded so a RESUME retries it (it may be transient).
+    errored=$((errored+1)); mark="ERR"
   fi
-  pkill -f 'ollama-proxy.js' 2>/dev/null    # reap any orphan proxy before the next cell
   printf '  [%3d] %-7s %-20s %-8s %-18s seed=%s\n' "$total" "$mark" "$name" "$a" "$m" "$s"
 }
 
@@ -104,5 +110,5 @@ for task in $TASKS; do
 done
 
 echo
-echo "battery: $passed/$total ran-passed; $skipped skipped (resume); $timedout timed out"
+echo "battery: $passed/$total ran-passed; $skipped skipped (resume); $timedout timed out; $errored errored"
 echo "report:  node crucible/report.js \"$LEDGER\""

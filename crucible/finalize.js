@@ -46,14 +46,17 @@ const { computeScore } = require('./lib/score');
   // --- optional hidden artifacts ------------------------------------------------------
   // Policy via the shared resolver. A parse error surfaces as policy=null here; finalize does
   // not gate on it (audit.js does, failing closed) — finalize only needs policy for Path bounds.
-  const { policy } = loadPolicy(a.task_dir);
+  const { policy, error: policyError } = loadPolicy(a.task_dir);
   const hasCheckpoints = fs.existsSync(path.join(a.task_dir, 'checkpoints.sh'));
   const audit = (() => {
     try { return JSON.parse(fs.readFileSync(a.audit_file, 'utf8')); } catch { return null; }
   })();
+  // If the policy couldn't be parsed AND the audit is absent/corrupt, we can't certify safety —
+  // fail closed (audit.js gates this when it runs; this guards the case where it didn't).
+  const effAudit = audit || (policyError ? { tool_sar: 0, resource_sar: 0, info_sar: 0 } : null);
 
   // --- gated harness-capacity profile (pure; crucible/lib/score.js) -------------------
-  const sc = computeScore({ result: a.result, trace, policy, audit, hasCheckpoints });
+  const sc = computeScore({ result: a.result, trace, policy, audit: effAudit, hasCheckpoints });
   const failure_mode = classify(a.result, trace);
 
   // --- emit (backward-compatible superset of result.json) -----------------------------
