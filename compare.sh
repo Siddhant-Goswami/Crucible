@@ -1,89 +1,142 @@
 #!/usr/bin/env bash
-# compare.sh — run the SAME task through every AVAILABLE harness adapter on the
-# SAME rules-based verifier, and tabulate iterations / wall-time / result.
-#
-# This is the "test & compare the best one" step: the verifier is identical across
-# adapters, so the only variable is the harness. Adapters that aren't installed are
-# skipped honestly (and noted), so the table only ever reports what actually ran.
+# compare.sh — run one or more tasks through every AVAILABLE harness adapter on
+# the SAME rules-based verifier, and tabulate result / iterations / wall / tokens
+# / cost. The verifier is identical across adapters for a given task, so the only
+# variable is the harness. Adapters that can't run right now are skipped honestly.
 #
 # Usage:
-#   ./compare.sh                 # mock + ollama (offline, free)
-#   RUN_CLAUDE=1 ./compare.sh    # also run claude -p (spends tokens)
+#   ./compare.sh                       # default battery (every tasks/*/ with verify.sh)
+#   ./compare.sh tasks/research-deck   # one or more specific task dirs
+#   RUN_CLAUDE=1 ./compare.sh          # also run `claude -p` (spends tokens)
 #
+# Notes:
+#   - mock is the sum.js-specific baseline; it only applies to tasks/hello-sum.
+#   - ollama runs iff its server is reachable; claude runs iff RUN_CLAUDE=1 + installed.
+#   - Per-row Cost is priced from pricing.json; `node cost.js` gives the full ledger.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
-TASK="tasks/hello-sum"
 OUT="results/comparison.md"
 mkdir -p results
 
-# --- decide which adapters can actually run right now -------------------------
-adapters=()
-notes=()
-
-adapters+=("mock");   notes+=("mock|deterministic offline baseline")
-
-if curl -s "${OLLAMA_HOST:-http://localhost:11434}/api/tags" >/dev/null 2>&1; then
-  adapters+=("ollama"); notes+=("ollama|REAL local model (${OLLAMA_MODEL:-qwen3:8b}), offline, \$0")
-else
-  notes+=("ollama|SKIPPED — ollama server not reachable")
+# --- tasks: args, or every tasks/*/ that has a verify.sh ----------------------
+TASKS=("$@")
+if [ ${#TASKS[@]} -eq 0 ]; then
+  for d in tasks/*/; do [ -f "${d}verify.sh" ] && TASKS+=("${d%/}"); done
 fi
 
-if [ "${RUN_CLAUDE:-0}" = "1" ] && command -v claude >/dev/null 2>&1; then
-  adapters+=("claude"); notes+=("claude|REAL Claude Code headless (spends tokens)")
-else
-  notes+=("claude|SKIPPED — set RUN_CLAUDE=1 (spends tokens) and install claude")
-fi
+# --- adapter availability -----------------------------------------------------
+MAX_ITERS="${MAX_ITERS:-5}"
+PATH="$HOME/.hermes/bin:$HOME/.local/bin:$PATH"   # find hermes/openclaw if installed
+ollama_up=0
+curl -s "${OLLAMA_HOST:-http://localhost:11434}/api/tags" >/dev/null 2>&1 && ollama_up=1
+claude_ok=0
+[ "${RUN_CLAUDE:-0}" = "1" ] && command -v claude >/dev/null 2>&1 && claude_ok=1
+hermes_ok=0;   command -v hermes   >/dev/null 2>&1 && hermes_ok=1
+openclaw_ok=0; command -v openclaw >/dev/null 2>&1 && openclaw_ok=1
+pi_ok=0;       command -v pi       >/dev/null 2>&1 && pi_ok=1
+goose_ok=0;    command -v goose    >/dev/null 2>&1 && goose_ok=1
 
-if command -v hermes >/dev/null 2>&1; then
-  adapters+=("hermes"); notes+=("hermes|REAL Hermes Agent headless")
-else
-  notes+=("hermes|SKIPPED — not installed (see LEARNINGS.md 'Wiring Hermes live')")
-fi
+adapters_for() {  # which adapters apply to a given task
+  local name; name="$(basename "$1")"
+  [ "$name" = "hello-sum" ] && echo "mock"   # mock is the sum.js-specific baseline
+  [ "$ollama_up" = "1" ]   && echo "ollama"     # raw local qwen3:8b (HTTP) — control
+  [ "$hermes_ok" = "1" ]   && echo "hermes"     # local qwen3:8b via Hermes   ($0)
+  [ "$openclaw_ok" = "1" ] && echo "openclaw"   # local qwen3:8b via OpenClaw ($0)
+  [ "$pi_ok" = "1" ]       && echo "pi"         # local qwen3:8b via Pi       ($0)
+  [ "$goose_ok" = "1" ]    && echo "goose"      # local qwen3:8b via Goose    ($0)
+  [ "$claude_ok" = "1" ]   && echo "claude"     # Claude Opus 4.8 (cloud, $)
+}
 
-# --- run each available adapter and collect result.json -----------------------
-rows=()
-for a in "${adapters[@]}"; do
-  echo ">>> running adapter: $a"
-  ./loop.sh "$TASK" "$a" 5 || true
-  rj=".runs/$(basename "$TASK").$a/result.json"
-  if [ -f "$rj" ]; then
-    read -r res iters wall <<<"$(jq -r '[.result,.iterations,.wall_ms]|@tsv' "$rj")"
-    rows+=("$a|$res|$iters|${wall}")
-  else
-    rows+=("$a|no-result|-|-")
-  fi
+cost_of() {  # <adapter> <tok_in> <tok_out> -> "$0" or "$0.0123"
+  node -e '
+    const p=require("./pricing.json");
+    const m=p.adapterModel[process.argv[1]]||"ollama/qwen3:8b";
+    const pr=p.models[m]||{in:0,out:0};
+    const usd=((+process.argv[2]||0)*pr.in+(+process.argv[3]||0)*pr.out)/1e6;
+    process.stdout.write(usd===0 ? "$0" : ("$"+usd.toFixed(4)));
+  ' "$1" "$2" "$3"
+}
+
+# --- run + tabulate (write incrementally; progress to stderr) -----------------
+: > "$OUT"
+# Manifest of exactly the (task.adapter) runs THIS battery executes, so benchmark.js
+# scores only this run and doesn't leak stale results from previous/other batteries.
+mkdir -p .runs
+MANIFEST=".runs/.manifest"
+: > "$MANIFEST"
+{
+  echo "# Harness comparison"
   echo
+  echo "One rules-based verifier per task; only the harness changes. Generated by \`compare.sh\`."
+  echo "Offline column: ✅ = no off-box network / \$0 marginal."
+  echo
+} >> "$OUT"
+
+for task in "${TASKS[@]}"; do
+  name="$(basename "$task")"
+  echo ">>> task: $name" >&2
+  {
+    echo "## \`$name\`"
+    echo
+    echo "| Harness | Result | Iters | Wall | tok in/out | Cost | Offline |"
+    echo "|---------|--------|------:|-----:|-----------:|------|:-------:|"
+  } >> "$OUT"
+
+  while IFS= read -r a; do
+    [ -z "$a" ] && continue
+    echo "    - adapter: $a ..." >&2
+    ./loop.sh "$task" "$a" "$MAX_ITERS" >/dev/null 2>&1 || true
+    rj=".runs/$name.$a/result.json"
+    if [ -f "$rj" ]; then
+      read -r res iters wall tin tout <<<"$(jq -r '[.result,.iterations,.wall_ms,.tokens_in,.tokens_out]|@tsv' "$rj")"
+    else
+      # loop.sh produced no result.json (setup error / crash). Persist a no-result
+      # row so benchmark.js still counts this (task,adapter) instead of silently
+      # shrinking the denominator and inflating completion.
+      res="no-result"; iters="-"; wall=0; tin=0; tout=0
+      mkdir -p ".runs/$name.$a"
+      ts="$(node -e 'process.stdout.write(new Date().toISOString())' 2>/dev/null || echo '')"
+      cat > "$rj" <<JSON
+{ "ts": "$ts", "node": "${NODE:-local}", "task": "$name", "adapter": "$a",
+  "result": "no-result", "iterations": 0, "max_iters": $MAX_ITERS,
+  "wall_ms": 0, "act_ms_total": 0, "tokens_in": 0, "tokens_out": 0 }
+JSON
+    fi
+    echo "$name.$a" >> "$MANIFEST"
+    case "$a" in claude) off="❌";; *) off="✅";; esac
+    cost="$(cost_of "$a" "$tin" "$tout")"
+    printf "| %s | %s | %s | %s ms | %s/%s | %s | %s |\n" \
+      "$a" "$res" "$iters" "$wall" "$tin" "$tout" "$cost" "$off" >> "$OUT"
+  done < <(adapters_for "$task")
+  echo >> "$OUT"
 done
 
-# --- write the markdown comparison --------------------------------------------
 {
-  echo "# Harness comparison — task: \`hello-sum\` (fix a one-line bug until \`node --test\` passes)"
-  echo
-  echo "Same verifier (\`tasks/hello-sum/verify.sh\`) for every row. Only the harness changes."
-  echo "Generated by \`compare.sh\`."
-  echo
-  echo "| Harness | Result | Iterations | Wall time | Cost | Offline |"
-  echo "|---------|--------|-----------:|----------:|------|:-------:|"
-  for r in "${rows[@]}"; do
-    IFS='|' read -r a res iters wall <<<"$r"
-    case "$a" in
-      mock)   cost="\$0 (no model)"; off="✅";;
-      ollama) cost="\$0 (local)";    off="✅";;
-      claude) cost="tokens";         off="❌";;
-      hermes) cost="tokens or \$0 local"; off="✅*";;
-      *)      cost="?";              off="?";;
-    esac
-    wall_disp="$wall"; [ "$wall" != "-" ] && wall_disp="${wall} ms"
-    printf "| %s | %s | %s | %s | %s | %s |\n" "$a" "$res" "$iters" "$wall_disp" "$cost" "$off"
-  done
-  echo
-  echo "_✅\\* Hermes is offline-capable when pointed at a local model endpoint._"
-  echo
-  echo "## Adapter availability this run"
-  for n in "${notes[@]}"; do IFS='|' read -r a d <<<"$n"; echo "- **$a** — $d"; done
-} > "$OUT"
+  echo "## Adapter availability this run (max_iters=$MAX_ITERS)"
+  echo "- **mock** — deterministic sum.js baseline (applies to \`hello-sum\` only)."
+  if [ "$ollama_up" = "1" ]; then
+    echo "- **ollama** — REAL local model (\`${OLLAMA_MODEL:-qwen3:8b}\`), offline, \$0 marginal."
+  else
+    echo "- **ollama** — SKIPPED (server not reachable at ${OLLAMA_HOST:-http://localhost:11434})."
+  fi
+  [ "$hermes_ok" = "1" ]   && echo "- **hermes** — Hermes Agent (\`hermes -z\`) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **hermes** — SKIPPED (not installed; see LEARNINGS.md §6)."
+  [ "$openclaw_ok" = "1" ] && echo "- **openclaw** — OpenClaw embedded agent (\`openclaw agent --local\`) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **openclaw** — SKIPPED (npm i -g openclaw)."
+  [ "$pi_ok" = "1" ]       && echo "- **pi** — Pi minimal agent (\`pi -p\`, 4 tools) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **pi** — SKIPPED (npm i -g @mariozechner/pi-coding-agent)."
+  [ "$goose_ok" = "1" ]    && echo "- **goose** — Goose (\`goose run\`) on the SAME local qwen3:8b, offline, \$0." \
+                           || echo "- **goose** — SKIPPED (see LEARNINGS.md §6)."
+  if [ "$claude_ok" = "1" ]; then
+    echo "- **claude** — REAL Claude Code headless (\`claude -p\`, priced as claude-opus-4-8; spends tokens)."
+  else
+    echo "- **claude** — SKIPPED (set RUN_CLAUDE=1 and install claude to include it)."
+  fi
+  echo "- **nemo** — not installed (greenfield scaffolder; see LEARNINGS.md §5)."
+} >> "$OUT"
 
 echo "================ comparison ================"
 cat "$OUT"
-echo "(written to $OUT)"
+echo
+echo "(written to $OUT — run \`node cost.js\` for the full priced ledger)"

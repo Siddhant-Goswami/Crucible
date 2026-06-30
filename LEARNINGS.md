@@ -152,6 +152,68 @@ rules-based verifier caught a mistake a real LLM kept making** — and an LLM-as
 would almost certainly have rubber-stamped (the model's *prose reasoning* sounded
 perfectly plausible). Rules-based verification isn't a nicety; it's the load-bearing wall.
 
+### 4c. Full battery — local model vs. Claude Opus 4.8, across complex loops
+
+Six tasks, one rules-based gate each, run through both real harnesses
+(`RUN_CLAUDE=1 ./compare.sh`). The battery grew beyond bug-fixes to cover the two
+harder 100x-loops, ported to the harness-agnostic runner: **`research-deck`**
+(Loop 02, research-to-artifact: assemble a deck where every claim is sourced and
+every slide has speaker notes) and **`self-improving-rubric`** (Loop 03, the
+meta-loop: propose a calibration block that encodes every open instructor correction).
+
+| Task | ollama (qwen3:8b) | claude (Opus 4.8) |
+|------|------------------:|------------------:|
+| `hello-sum` | ✅ 1 iter · $0 | ✅ 1 iter · $0.55 |
+| `fizzbuzz` | ✅ 1 iter · $0 | ✅ 1 iter · $0.89 |
+| `roman-numerals` | ✅ 1 iter · $0 | ✅ 1 iter · $0.90 |
+| `temp-convert` (2 files) | ✅ 1 iter · $0 | ✅ 1 iter · $0.73 |
+| `research-deck` (Loop 02) | ✅ 1 iter · $0 | ✅ 1 iter · $0.85 |
+| `self-improving-rubric` (Loop 03) | ✅ 1 iter · $0 | ✅ 1 iter · $0.58 |
+
+**Both harnesses pass every task on the first iteration** — the rules-based gate
+records identical *outcomes*. The only axis that moves is cost: the local model is
+**$0 marginal**, Claude averages **~$0.72/run** (priced as Opus 4.8; Claude's input
+is dominated by cached system/tools counted here at full rate — a deliberate upper
+bound). Takeaways:
+
+- The harness-agnostic adapter generalizes past toy bug-fixes: the *same* one-line
+  contract drove a multi-file fix, a sourced-artifact generation, and a self-modifying
+  rule proposal. The integrity guard (can't edit tests / `verify.sh` / `TASK.md`) is
+  what makes "the model passed the gate" trustworthy across all of them.
+- For bounded, rules-verifiable tasks like these, a lean local harness matches a
+  frontier one on the outcome the gate measures — so paying frontier per-token prices
+  buys nothing the verifier can see. Spend it where the task genuinely needs the
+  capability, not on work a $0 local model already passes.
+
+### 4d. The harness benchmark — 7 harnesses, one verifier (`./benchmark.sh`)
+
+To make this a real *harness* comparison (not just local-vs-cloud), four more
+harnesses were installed and wired to the **same local `qwen3:8b`**, so the model is
+held constant and the harness is the only variable. Full report + methodology (mapped
+to Addy Osmani's agent-harness-engineering dimensions) in
+[`results/BENCHMARK.md`](./results/BENCHMARK.md); the scorecard:
+
+| Harness | Positioning | Completion | Recovery (iters→pass) | Latency | Cost | Offline |
+|---------|-------------|-----------:|----------------------:|--------:|-----:|:-------:|
+| ollama   | raw model, thinnest harness (control) | 6/6 | 1.0 | 15.5s | $0 | ✅ |
+| pi       | minimalist (4 tools, <1k prompt) | 6/6 | 1.5 | 224.9s | $0 | ✅ |
+| hermes   | safety-first lean harness | 5/6 | 1.2 | 141.2s | $0 | ✅ |
+| goose    | heavy, model-agnostic (recipes) | 4/5* | 1.0 | 196.9s | $0 | ✅ |
+| openclaw | chat gateway (not a coding harness) | 2/6 | 2.5 | 102.8s | $0 | ✅ |
+| claude   | batteries-included frontier (cloud) | 6/6 | 1.0 | 30.2s | ~$0.72/run | ❌ |
+
+\* goose did not finish `research-deck` (the heaviest task) within run-time limits —
+its runtime *is* the finding; that cell is reported as not-run, not dropped.
+
+The result the loop thesis predicts: **on rules-verifiable tasks the harness, not the
+model, explains the differences** — and the *thinnest* harness on a $0 local model
+(`ollama`) matched the frontier cloud harness (`claude`) on completion at the lowest
+local latency. Pi (minimalist) completes everything but needs more verify→fix loops;
+OpenClaw (a chat gateway pressed into the contract) is weakest, exactly at the edge
+you'd expect. Caveat: per-run token/context is only captured for `ollama`/`claude`
+(the others drive the model through their own runtimes), so latency is the comparable
+efficiency proxy for the rest.
+
 ---
 
 ## 5. Key learnings & gotchas (discovered while building)
@@ -201,32 +263,85 @@ perfectly plausible). Rules-based verification isn't a nicety; it's the load-bea
 
 ---
 
-## 6. Wiring Hermes live (the opt-in production path)
+## 6. Wiring Hermes & OpenClaw live (done — verified on this machine)
 
-The prototype is ready for it — `adapters/hermes.sh` already implements the
-contract. To switch the live harness from local-Ollama to Hermes:
+Both are now installed and driven by `adapters/hermes.sh` / `adapters/openclaw.sh`,
+each pointed at the **same local Ollama `qwen3:8b`** as the `ollama` adapter — so a
+row difference is the *harness*, not the model. The exact steps that worked:
 
+### Hermes (`hermes -z`)
 ```bash
-# 1) Install (review the script first; trust only the official domain)
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-source ~/.zshrc
+# Install lean (review the script first; trust only the official domain). We skip
+# Playwright/Chromium (browser tools we don't need) and the interactive wizard:
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- \
+  --skip-browser --skip-setup --non-interactive
 
-# 2) Make it SAFE + LEAN + OFFLINE: point it at the SAME local Ollama we already use
-hermes config set model.provider custom
+# Point it at local Ollama. NOTE: real config keys differ from early guesses —
+# it's model.default (not model.name), and Hermes ENFORCES a >=64K context window,
+# so you must also raise Ollama's runtime context or it refuses to run:
+hermes config set model.provider ollama
 hermes config set model.base_url http://localhost:11434/v1
-hermes config set model.name qwen3:8b
-hermes config set terminal.backend local     # leanest; use 'docker' for real isolation
-# keep command-approval = manual (default); do NOT use --yolo on the local backend
+hermes config set model.default qwen3:8b
+hermes config set model.context_length 65536   # bypass the 64K display-window gate
+hermes config set model.ollama_num_ctx 65536   # make Ollama actually load it at 64K
+hermes config set terminal.backend local        # leanest; 'docker' for isolation
 
-# 3) Run the exact same loop, now driven by Hermes
-./loop.sh tasks/hello-sum hermes 5
-RUN_CLAUDE=0 ./compare.sh                     # hermes row now populates automatically
+./loop.sh tasks/hello-sum hermes 3               # passes in 1 iter, offline, $0
+```
+`hermes -z PROMPT` is the headless one-shot: prints only the final text and
+auto-bypasses command approval (it's built for scripts), so it edits files with its
+own tools — no `--yolo` needed (and the LEARNINGS rule still holds: don't `--yolo`
+the local backend). Because Hermes speaks the `agentskills.io` skill format, the
+loops' `/grade` skill copies to `~/.hermes/skills/grade/` and runs as `/grade`.
+
+### OpenClaw (`openclaw agent --local`)
+OpenClaw is a **personal-assistant chat gateway** (WhatsApp/Telegram/Slack/iMessage/…),
+not a coding harness — but its embedded one-shot agent has host file tools, so it
+fits the adapter contract too.
+```bash
+npm install -g openclaw@latest --cache /tmp/oc-npm-cache   # clean cache avoids a
+                                                           # root-owned ~/.npm EACCES
+# Three non-obvious things, all discovered the hard way:
+#  1. Ollama must be "registered" — set OLLAMA_API_KEY to ANY value.
+#  2. `openclaw agent` needs a session selector (--session-key agent:<id>:<key>).
+#  3. Its write/edit tools target the CONFIGURED workspace, not cwd — so the adapter
+#     sets agents.defaults.workspace to the sandbox dir on each run.
+OLLAMA_API_KEY=ollama ./loop.sh tasks/hello-sum openclaw 3   # offline, $0
 ```
 
-Because Hermes speaks the `agentskills.io` skill format, the loops' `/grade` skill
-(`loops/01-grading-loop/.claude/skills/grade/SKILL.md`) can be copied to
-`~/.hermes/skills/grade/` and invoked as `/grade` inside Hermes essentially as-is —
-the cleanest possible "use my loops with this harness."
+### Pi (`pi -p`) — the minimalist harness
+```bash
+npm install -g @mariozechner/pi-coding-agent --cache /tmp/pi-npm-cache
+# Pi has NO built-in Ollama provider, but registers custom OpenAI-compatible ones
+# via ~/.pi/agent/models.json (this is a {providers:{…}} object, NOT a flat array):
+#   { "providers": { "ollama": { "baseUrl":"http://localhost:11434/v1",
+#       "api":"openai-completions", "apiKey":"ollama",
+#       "compat": { "supportsDeveloperRole": false },   # Ollama OpenAI-compat quirk
+#       "models": [ { "id":"qwen3:8b" } ] } } }
+pi --model ollama/qwen3:8b -p "…"        # non-interactive; 4 tools (read/write/edit/bash)
+```
+Pi is the deliberate anti-bloat harness (sub-1k system prompt). Note: the OpenRouter
+key already on this box returned `401 User not found`, so the local-Ollama route is
+the only working $0 path — and it's the right one for holding the model constant.
+
+### Goose (`goose run`) — Block / Agentic AI Foundation
+```bash
+curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh \
+  | CONFIGURE=false bash                  # prebuilt binary -> ~/.local/bin/goose
+# Configure entirely by env (no `goose configure` wizard); GOOSE_MODE=auto so it
+# never hangs on tool approval in headless runs:
+GOOSE_PROVIDER=ollama GOOSE_MODEL=qwen3:8b OLLAMA_HOST=http://localhost:11434 \
+  GOOSE_MODE=auto goose run --no-session -q -t "…"
+```
+Goose is the heaviest lean harness here (Rust + many tools); on the trivial hello-sum
+it took ~128s vs Pi's ~43s on the *same* model — the harness-weight tax, measured.
+
+> **Supply-chain caution (real).** When verifying these, the GitHub API reported
+> impossible star counts (hermes-agent ~205k created mid-2025, openclaw ~381k created
+> late-2025 — both faster than anything in GitHub history). Whether spoofed metadata
+> in this environment or coordinated fake-stars, it's exactly the §5.8 trap: trust the
+> *reviewed install script + official domain*, not popularity signals. Every install
+> here (Hermes, OpenClaw, Pi, Goose) was reviewed before running.
 
 ---
 
@@ -245,6 +360,11 @@ the cleanest possible "use my loops with this harness."
 
 ## 8. Sources
 
+- **Agent harness engineering (benchmark framing)** — Addy Osmani, https://addyosmani.com/blog/agent-harness-engineering/
+- **Pi & Goose vs Claude Code** — Itai Spector, https://medium.com/@itaispector1/the-claude-code-killer-hype-what-pi-and-goose-actually-get-right-and-wrong-fb1a27abb5ce
+- **Agentic coding harnesses: a comparison** — P. Rowe, https://prowe214.medium.com/agentic-coding-harnesses-a-comparison-4db34b87fd5c
+- Pi coding agent — https://pi.dev/ · https://www.npmjs.com/package/@mariozechner/pi-coding-agent
+- Goose — https://github.com/aaif-goose/goose · https://goose-docs.ai/
 - 100x-loops — https://github.com/Siddhant-Goswami/100x-loops
 - Hermes Agent — https://github.com/NousResearch/hermes-agent ·
   docs https://hermes-agent.nousresearch.com/docs ·

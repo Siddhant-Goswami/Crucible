@@ -1,0 +1,4 @@
+{"submission_id":"alice","machine_overall":"pass","human_overall":"pass","agreed":true,"lesson":"","recorded":"2026-06-29"}
+{"submission_id":"bob","machine_overall":"fail","human_overall":"fail","agreed":true,"lesson":"","recorded":"2026-06-29"}
+{"submission_id":"carol","machine_overall":"partial","human_overall":"pass","agreed":false,"lesson":"implicit termination still satisfies criterion (c); don't require the literal word","recorded":"2026-06-29"}
+{"submission_id":"dave","machine_overall":"fail","human_overall":"partial","agreed":false,"lesson":"keyword-stuffing is an integrity issue, not a content fail","recorded":"2026-06-29"}

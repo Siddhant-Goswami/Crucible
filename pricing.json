@@ -9,12 +9,16 @@
     "claude-fable-5":       { "in": 10.00, "out": 50.00, "note": "Anthropic list" },
     "openrouter/qwen3-8b":  { "in": 0.035, "out": 0.138, "note": "approx OpenRouter, verify" }
   },
+  "_adapterModel_note": "Maps each adapter to the model it ACTUALLY runs here. hermes/openclaw/pi/goose are all wired to the same local Ollama qwen3:8b as the ollama adapter, so they price to $0 — the benchmark isolates the harness, not the model. Only claude runs a cloud model.",
   "adapterModel": {
-    "mock":   "ollama/qwen3:8b",
-    "ollama": "ollama/qwen3:8b",
-    "hermes": "claude-haiku-4-5",
-    "claude": "claude-opus-4-8",
-    "nemo":   "ollama/qwen3:8b"
+    "mock":     "ollama/qwen3:8b",
+    "ollama":   "ollama/qwen3:8b",
+    "hermes":   "ollama/qwen3:8b",
+    "openclaw": "ollama/qwen3:8b",
+    "pi":       "ollama/qwen3:8b",
+    "goose":    "ollama/qwen3:8b",
+    "claude":   "claude-opus-4-8",
+    "nemo":     "ollama/qwen3:8b"
   },
   "infra": {
     "_comment": "Monthly $ to KEEP A NODE RUNNING. Amortized per-run in cost.js if you set runsPerMonth.",
