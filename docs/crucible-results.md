@@ -177,7 +177,57 @@ at a metered ~$1.4/run (a cache-inflated upper bound).
 - **Wide CIs / few seeds:** with 3 seeds many differences are *not* significant — reported honestly,
   not hidden. `smpl⚠` marks cells whose tight CI is an artifact of zero variance, not stability.
 
-## 6. Reproduce
+## 6. Claude *as the model* behind the lean harnesses (a frontier slice)
+
+The v1/v2 batteries run `claude` as a whole *harness* (Claude Code driving its own tools). A natural
+follow-on: hold the **model** as Claude but swap the **harness** — i.e. put a frontier model *behind*
+the lean harnesses and see what changes. Since the harnesses speak Ollama/OpenAI HTTP and Claude
+speaks the Anthropic API, we bridge them with **`crucible/proxy/claude-shim.js`**: an
+Ollama/OpenAI-compatible endpoint that answers each request by shelling out to the authenticated
+`claude -p` (Claude Code, tools OFF → a plain text completion) using the **logged-in session** (no
+API key). The wiring reuses the metering path unchanged: `harness → Crucible proxy (meters) → shim →
+claude -p`. Run it with `OLLAMA_UPSTREAM=<shim>` and `HARNESS_MODEL=claude-opus-4-8`.
+
+**Scorecard (`crucible/results/SCORECARD-claude.md`, 23 runs):**
+
+| Harness | n | TO | Score [95% CI] | Completion | Path | State | Cost/run | Succ/Mtok |
+|---|--:|--:|---|--:|--:|--:|--:|--:|
+| aider | 9 |  | **0.98** [0.96, 1] | 1 | 1 | 0.89 | **$1.59** | **3** |
+| ollama | 9 |  | **0.97** [0.95, 0.99] | 1 | 0.98 | 0.89 | **$0.27** | **26** |
+| mock (floor) | 1 |  | 1.00 | — | — | — | $0 | — |
+| pi · hermes · goose · openclaw | 0 | 1 ea | _all timed out_ | — | — | — | — | — |
+
+Four findings, each a clean instance of a core principle:
+
+- **6.1 A frontier model compresses Score (P8).** Both text-format harnesses pass **9/9** and land at
+  0.97–0.98 — `aider` vs `ollama` is Δ=**0.004** [0, 0.011], **not significant**. With a strong enough
+  model the harness barely moves the *quality* number. This is the expected compression, not a null
+  result: the discriminating power that mid-size models gave us (§5.1) flattens at the top.
+- **6.2 …so Cost becomes the discriminator (P7).** What Score no longer separates, cost does — and
+  loudly: `aider` costs **$1.59/run** at **3** successes/Mtok, `ollama` **$0.27/run** at **26**
+  (~6× cheaper, ~9× more token-efficient). `aider`'s `tool-recover` cells alone burned **613k–875k**
+  input tokens each (many iterations, each re-sending accumulated context) versus `ollama`'s ~24k.
+  On top of that, *every* shim call carries a ~22k-token Claude Code system-prompt baseline — the
+  "using-Claude-Code-as-a-model" tax, metered honestly. Exactly why Score never folds in cost.
+- **6.3 A strong model erodes a tool-discriminating task.** `tool-recover` is built so a file-only
+  harness *must* fail — it has to run a two-phase generator to produce a 200-entry fixture ("do not
+  hand-write it"). With a weak local model that held. With Claude, **`ollama` passes it (0.933)**:
+  the run executed **zero commands** and Claude simply **hand-wrote all 200 fixture entries**. The
+  outcome-based verifier can't tell (it just runs the test); only **State docked it (0.667)**. The
+  lesson is about task design — to stay discriminating against strong models, a tool-required task
+  must make the artifact genuinely uncomputable-by-hand (seeded/networked/secret) or have the tool
+  emit a proof-of-execution the verifier checks.
+- **6.4 Only text-format harnesses can drive Claude here — the §5.2 split, at the harness level.**
+  `ollama` and `aider` communicate edits as *text* (file blocks / search-replace), so a plain
+  completion suffices. The tool-calling harnesses (`pi`, `hermes`, `goose`, `openclaw`) need the
+  model to emit **structured tool-calls**, which `claude -p` (Claude Code's own tools, not arbitrary
+  external schemas) cannot produce — and a subscription/OAuth login gives no raw Messages-API access
+  to translate OpenAI↔Anthropic tool-calls. So all four **time out** waiting for a tool-call that
+  never comes. (`codex` is excluded: its reserved `ollama` provider bypasses the proxy, so it can't
+  be pointed at the shim at all.) The same structural fault line as the reasoning-model result:
+  *what shape the interface expects* decides whether a harness can use a given model.
+
+## 7. Reproduce
 
 ```bash
 # prerequisites: ollama running with the probe models; node 22; (claude CLI for the frontier slice)
@@ -192,12 +242,17 @@ node crucible/report.js crucible/results/battery.jsonl
 
 # one instrumented run:
 CRUCIBLE=1 HARNESS_MODEL=qwen3:8b SEED=1 ./loop.sh crucible/tasks/tool-recover pi 6
+
+# §6 frontier slice — Claude as the MODEL behind a lean harness (uses the logged-in claude CLI):
+node crucible/proxy/claude-shim.js --portfile /tmp/shim.port &   # bridge: Ollama/OpenAI -> claude -p
+CRUCIBLE=1 HARNESS_MODEL=claude-opus-4-8 OLLAMA_UPSTREAM="http://127.0.0.1:$(cat /tmp/shim.port)" \
+  ./loop.sh tasks/hello-sum ollama 4
 ```
 
 The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-checked
 (`.github/workflows/crucible.yml`).
 
-## 7. Reading it honestly (caveats)
+## 8. Reading it honestly (caveats)
 
 - **Cost for Claude is an upper bound** — `claude.sh` counts cache tokens at full rate (no cache
   discount), so its reported $ overstates the real spend.
@@ -213,3 +268,9 @@ The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-che
   discriminating probes.
 - **Timed-out cells are logged, not dropped** — a hung cell is killed at its `wall_timeout_s` and
   left absent so a resume retries it; the battery summary reports the count.
+- **The §6 Claude slice is a plain-text completion, not agentic Claude Code** — the shim runs
+  `claude -p` with tools OFF via the *logged-in session* (OAuth, no API key), so it measures the lean
+  harness driving Claude *as a raw model*, not Claude Code's own tool-use. Its cost is the same
+  cache-inflated upper bound, inflated further by a ~22k-token per-call Claude Code system-prompt
+  baseline. Tool-calling harnesses can't be measured this way (§6.4) — a limitation of the bridge,
+  recorded as timeouts, not a harness score.

@@ -86,6 +86,16 @@ declaring tier, budgets, policy, and seeds.
 - **The T1 tool-recovery tier needs a tool-capable harness.** The `ollama` control adapter only
   writes files (no shell tool), so it cannot attempt tool-recovery tasks — which is itself the
   honest signal that a thin harness lacks that capacity. Demonstrating T1 requires `pi`/`hermes`/
-  `claude` wired with their tools.
+  `claude` wired with their tools. **Caveat found in the §6 Claude slice:** a *strong enough* model
+  can defeat T1 without any tool — driven by Claude, the file-only `ollama` harness passed
+  `tool-recover` by **hand-writing the 200-entry fixture** the generator was meant to produce (the
+  outcome-based verifier can't tell; only State dinged it). Tool-required tasks must make the
+  artifact genuinely uncomputable-by-hand, or check a proof-of-execution.
+- **Claude can be run as the MODEL behind a lean harness**, not just as its own harness, via
+  `proxy/claude-shim.js` — an Ollama/OpenAI endpoint backed by the logged-in `claude -p` (tools off).
+  Point `OLLAMA_UPSTREAM` at it and set `HARNESS_MODEL=claude-opus-4-8`. Only **text-format** harnesses
+  (`ollama`, `aider`) can drive it; tool-calling harnesses (`pi`/`hermes`/`goose`/`openclaw`) need
+  structured tool-calls a plain completion can't emit, so they time out (see `docs/crucible-results.md`
+  §6). Metering flows through the normal proxy; cost carries a ~22k-token/call Claude Code baseline.
 - **Compute**: the full `harness × model × seed × task` grid is large; keep the default battery
   small and log any cap — never silently truncate.

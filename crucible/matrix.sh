@@ -96,6 +96,7 @@ for task in $TASKS; do
   mi="$(meta "$td" budgets.max_iters)"; mi="${mi:-5}"
   mt="$(meta "$td" budgets.max_tokens)"; mt="${mt:-0}"
   wt="$(meta "$td" budgets.wall_timeout_s)"; wt="${wt:-0}"
+  [ -n "${WALL_TIMEOUT_OVERRIDE:-}" ] && wt="$WALL_TIMEOUT_OVERRIDE"   # shorten timeouts (e.g. fast-fail hang-prone cells)
   seeds="$SEEDS"; [ -z "$seeds" ] && seeds="$(meta "$td" seeds)"; [ -z "$seeds" ] && seeds="1"
   IFS=',' read -r -a SEED_ARR <<< "$seeds"
   for a in "${ADA[@]}"; do
