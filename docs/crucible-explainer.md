@@ -213,12 +213,16 @@ structured language (its tool-call protocol), and these small local models don't
 blame the model, when the harness is what failed.
 
 **2. How a model *talks* can break a harness — not just how smart it is.** Two of our models
-(`deepseek-r1`) "think out loud" — they narrate their reasoning in `<think>…</think>` before
-answering. Harnesses with a picky parser choke on that narration and score **0**, while the same
-harnesses hit ~1.0 on `qwen3:8b`, which just gives a clean answer. Only the tolerant harnesses
-(`aider`, `ollama`) shrugged off the thinking-out-loud and still got the work done. Lesson: a good
-harness has to cope with *messy* model output, not just *smart* model output. That robustness is
-why **aider** was the standout — it's the only lean harness that cleared every model we threw at it.
+(`deepseek-r1`) "think out loud" — they narrate a long chain of reasoning in `<think>…</think>`
+before giving an answer. The same harnesses that scored ~1.0 on `qwen3:8b` (which answers cleanly)
+scored **0** on these — but when we opened the logs, they'd failed in *different* ways: `pi` and
+`goose` received the model's reply just fine but couldn't turn that rambling, reasoning-heavy output
+into an actual file edit; `hermes` couldn't even complete a call to the model at all. Only the
+tolerant harnesses (`aider`, `ollama`) coped with the messy output and still got the work done.
+Two lessons: a good harness has to survive *messy* model output, not just *smart* model output —
+and a bare "it scored 0" can hide very different underlying failures, which is why we read the
+traces instead of guessing. That robustness is why **aider** was the standout — the only lean
+harness that cleared every model we threw at it.
 
 **3. The safety gate isn't decorative — it fired.** Remember Safety multiplies the whole score to 0
 if a harness breaks a rule? It caught more than the dummy baseline this time. Even `aider`, our best

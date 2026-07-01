@@ -97,16 +97,36 @@ error) and passes.
 | codex | 0.00 | 0.00 *(4 TO)* | 0.00 | — |
 | mock (floor) | 0.13, **Safety 0.97 (22% gated)** | — | — | — |
 
-### 5.2 The output *shape* reorders the field as much as model strength (P2, P8)
+### 5.2 The output *shape* reorders the field — and "Score 0" hides ≥3 different reasons (P2, P8)
 Read across the two reasoning models (`deepseek-r1:*`) against the clean-output one (`qwen3:8b`) and
 a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses — `pi`, `hermes`,
 `goose`, `codex` — collapse to **0**, yet on `qwen3:8b` those same harnesses jump to ~0.9–1.0. The
 only harnesses that survive the deepseek models are **`aider`** (0.58 / 0.88) and the thin **`ollama`**
-control (0.12 / 0.68). The most economical explanation: deepseek-r1 emits `<think>` reasoning traces,
-and a harness with a brittle tool-call/file-block parser chokes on them, while `aider`'s and
-`ollama`'s tolerant parsers extract the edit anyway. So it isn't only *how strong* the model is — it's
-*what shape its output takes*, interacting with the harness's parser. Exactly why a score must name a
-`(harness, model)` pair, never a harness alone.
+control (0.12 / 0.68).
+
+We read the per-run traces instead of guessing at one cause — and the shared `0` is **not one
+failure, it is at least three distinct ones**, which is the more honest (and more useful) finding:
+
+- **`pi` and `goose` — the model answers, the harness can't commit it.** The metering proxy logged a
+  full model response on *every* iteration (`pi` ~5.3k output tokens over 6 iters; `goose` ~144k
+  across its `deepseek-r1:8b` cells), yet no file was ever written (`files_written: []`, empty command
+  log) — so every cell is an `artifact_commitment` failure. `deepseek-r1`'s reply is dominated by
+  `<think>…</think>` reasoning narration (a live probe: over half of a short reply is reasoning
+  before any answer), so the harness's parse-and-apply step never extracts an actionable edit. The
+  model talked; the harness couldn't act on it.
+- **`hermes` — no successful call at all.** Zero proxy events and **0 tokens on every deepseek cell**
+  (both `1.5b` and `8b`): hermes never completed a single metered model call. That is an *upstream*
+  transport/config failure (hermes needs a ≥64K context window via an OpenAI-`/v1` redirect, and the
+  request errors before anything is logged) — **not** a parser choking on output, because there is no
+  output to choke on. The opposite mechanism from `pi`/`goose`.
+- **`codex` — a protocol mismatch** (detailed in §5.4): it requires the model to speak its structured
+  tool-call format, the local models can't, and it commits nothing.
+
+So the headline holds — *what shape the model's output takes* reorders the field as much as how
+strong the model is — but the reason a harness lands at `0` is **harness-specific**, and only
+visible in the traces. `aider`'s and `ollama`'s tolerant parsers ride out the reasoning narration and
+commit the edit anyway. Exactly why a score must name a `(harness, model)` pair, never a harness
+alone — and why a bare "Score 0" is a prompt to open the trace, not a conclusion.
 
 ### 5.3 `aider` has reach; the rest are model-specific (P4)
 Averaged across the local panel, **`aider` leads every non-Claude harness on transfer (mean 0.73)** —
@@ -136,10 +156,15 @@ the multiplicative gate surfaces it rather than letting completion paper over it
 
 ### 5.6 How harnesses fail, and what they cost (P1, P7)
 The dominant failure mode is **`artifact_commitment`** — no usable output — and it dwarfs the rest:
-`codex` 77, `hermes` 54, `pi` 49, `goose` 48, `ollama` 16, `aider` 6. `aider` and `ollama` are the
-only harnesses whose failures spread across the taxonomy (contract-format, tool-recovery, state)
-instead of piling entirely into "produced nothing" — the signature of a harness that *engages* the
-task rather than bouncing off it. **Claude failed nothing (12/12).** Cost/latency is first-class:
+`codex` 77, `hermes` 54, `pi` 49, `goose` 48, `ollama` 16, `aider` 6. One caveat the taxonomy alone
+hides (and §5.2 unpacks): `artifact_commitment` is an *outcome* label — "no file committed" — that
+**lumps together at least two root causes**. `pi`/`goose` reach it with the model *answering* but
+the harness unable to apply the reply; `hermes`/`codex` reach it having never obtained a usable model
+response at all. Same bucket, opposite mechanisms — the trace, not the label, tells them apart.
+`aider` and `ollama` are the only harnesses whose failures spread across the taxonomy (contract-format,
+tool-recovery, state) instead of piling entirely into "produced nothing" — the signature of a harness
+that *engages* the task rather than bouncing off it. **Claude failed nothing (12/12).** Cost/latency
+is first-class:
 **55 cells timed out** — `goose` alone burned **18** on `qwen3:8b`, so its ~1.0 headline there is over
 just the 9 cells it finished; read it *with* the `TO` column. On token efficiency `ollama`@`qwen3:8b`
 is most frugal (369 successes/Mtok), `aider` competitive (108–142), and Claude's quality is highest
