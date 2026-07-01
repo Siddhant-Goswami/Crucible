@@ -28,33 +28,30 @@ resume after a context reset.
 
 Commits: `2db1725` (B adapters), `e4f32b1` (A infra).
 
-## What's RUNNING
+## What's DONE — the battery COMPLETED (2026-07-01)
 
-The **full grid** is running durably via `run-detached.sh` (launched with `RUN_CLAUDE=1 RESUME=1`),
-resuming the on-disk ledger `crucible/results/battery.jsonl` (gitignored). Full local grid = **495
-cells** (9 tasks × [mock + 6 lean × 3 models × 3 seeds]) + the Claude slice.
-Progress at handoff: **~386/495 local cells done, ~109 remaining** (the slow tail: codex/aider/goose/
-hermes on `secret-redaction`/`tool-recover`/`api-migration`), 142 passes, 41 timeouts. **ETA ~3 h.**
+The **full grid ran to completion** durably via `run-detached.sh` (launchd + caffeinate). Final
+ledger `crucible/results/battery.jsonl` (gitignored): **507 runs, 55 timeouts, no coverage gaps**
+(8 harnesses × 3 local models × 9 tasks × 3 seeds + the Claude slice). The idle launchd job has been
+stopped + unloaded (`run-detached.sh stop`). Scorecard + ENV regenerated; writeup rewritten from the
+new numbers; committed + pushed as **`498f3f8`** on `crucible-v2`.
 
-Check it: `./crucible/run-detached.sh status`  ·  `tail -f crucible/results/bench.log`
-Stop it (resumable): `./crucible/run-detached.sh stop`
+**Headline results (see `docs/crucible-results.md` §5 / `crucible/results/SCORECARD.md`):**
+- **aider** is the standout lean harness — the only non-Claude harness with reach across all 3
+  models (0.58 / 0.73 / 0.88 on r1:1.5b / qwen3:8b / r1:8b), significantly beats the `ollama` control
+  on both deepseek-r1 models. Metered, ~$0.
+- **codex** = structural zero (**0/77**): local models can't drive its structured tool protocol
+  ("unsupported tool call") → no artifact; fails clean. Unmetered.
+- **Output shape reorders the field:** pi/hermes/goose/codex collapse to 0 on both reasoning models
+  (deepseek-r1 `<think>` traces break brittle parsers) but reach ~1.0 on clean-output qwen3:8b; only
+  aider + ollama survive the reasoning models.
+- **Safety gate** now catches more than `mock` — aider trips it on a couple cells (Safety 0.92/0.98).
 
-## What's LEFT — finish task 17 (do this when the run completes)
+## What's LEFT
 
-1. Confirm done: `./crucible/run-detached.sh status` shows not-running, and
-   `wc -l crucible/results/battery.jsonl` has stabilized (~495+ rows). If cells are still missing,
-   `RESUME=1 ./crucible/run-detached.sh start` to backfill.
-2. Regenerate the scorecard: `node crucible/report.js crucible/results/battery.jsonl`
-   (bench.sh also writes it at the end). Confirm codex/aider rows across all 3 models, the `TO`
-   column, transfer, significance, failure modes.
-3. **Refresh the writeup + docs** with the complete numbers + expanded panel:
-   - `docs/crucible-results.md` §5 (rewrite the headline from the new SCORECARD; note codex is
-     unmetered + fails-on-local-models finding; aider metered).
-   - `crucible/README.md` harness list + `docs/crucible-explainer.md` panel (add codex, aider,
-     3 models).
-   - Commit `SCORECARD.md` + `ENV.md` + the doc edits; push `crucible-v2`; the PR is ready to merge.
-4. After merge: `git checkout main && git pull`; delete `crucible-v2` (local+remote) like the prior
-   cleanup.
+1. **Open + merge the PR** for `crucible-v2` (branch is pushed and PR-ready).
+2. After merge: `git checkout main && git pull`; delete `crucible-v2` (local+remote) like the prior
+   cleanup. Also fine to `git clean` the ignored `.aider*` / `crucible/results/*.jsonl` locals.
 
 ## Key facts / gotchas
 - Durability: **launchd, not `nohup` from an agent session** — the latter gets SIGTERM'd. `caffeinate`
