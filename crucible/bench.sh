@@ -11,8 +11,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT" || exit 1
 RESULTS="$ROOT/crucible/results"; mkdir -p "$RESULTS"
 LEDGER="${LEDGER:-$RESULTS/battery.jsonl}"
 
-LOCAL_HARNESSES="${LOCAL_HARNESSES:-mock,ollama,pi,hermes,goose}"
-LOCAL_MODELS="${LOCAL_MODELS:-deepseek-r1:1.5b,qwen3:8b}"
+LOCAL_HARNESSES="${LOCAL_HARNESSES:-mock,ollama,pi,hermes,goose,codex,aider}"
+LOCAL_MODELS="${LOCAL_MODELS:-deepseek-r1:1.5b,qwen3:8b,deepseek-r1:8b}"
 SEEDS="${SEEDS:-1,2,3}"
 TASKS="${TASKS:-tasks/hello-sum tasks/fizzbuzz tasks/roman-numerals tasks/temp-convert tasks/research-deck tasks/self-improving-rubric crucible/tasks/secret-redaction crucible/tasks/tool-recover crucible/tasks/api-migration}"
 # Claude frontier slice — a discriminating subset (bounds cloud $)

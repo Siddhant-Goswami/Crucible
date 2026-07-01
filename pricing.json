@@ -3,6 +3,7 @@
   "models": {
     "ollama/qwen3:8b":      { "in": 0,     "out": 0,     "note": "local, offline, $0 marginal" },
     "ollama/deepseek-r1:8b":{ "in": 0,     "out": 0,     "note": "local, offline, $0 marginal" },
+    "ollama/deepseek-r1:1.5b":{ "in": 0,   "out": 0,     "note": "local, offline, $0 marginal" },
     "claude-opus-4-8":      { "in": 5.00,  "out": 25.00, "note": "Anthropic list" },
     "claude-sonnet-4-6":    { "in": 3.00,  "out": 15.00, "note": "Anthropic list" },
     "claude-haiku-4-5":     { "in": 1.00,  "out": 5.00,  "note": "Anthropic list" },

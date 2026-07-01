@@ -25,3 +25,8 @@ loops/01-grading-loop/review-queue/
 # crucible benchmark — generated battery artifacts (the spec, code, schemas & tasks ARE tracked)
 crucible/results/*.jsonl
 crucible/results/*.log
+
+# aider harness local droppings (created when the aider adapter runs)
+.aider.chat.history.md
+.aider.input.history
+.aider*
