@@ -179,7 +179,63 @@ harnesses fail, *how* do they fail?).
 
 ---
 
-## 9. Want to test your own harness or task?
+## 9. What we actually found (a real 507-run battery)
+
+We didn't just build the benchmark — we ran it. The full battery was **507 runs**: 8 harnesses ×
+3 local models × 9 tasks × 3 repeats each (plus a slice on Claude). Here's the story in plain
+English. (The exact numbers and error bars live in
+[`docs/crucible-results.md`](./crucible-results.md) §5.)
+
+### The headline: the harness really is the thing
+
+Same model, same task — but swap the harness and the result swings from **near-perfect to total
+failure.** That's the whole thesis, confirmed: on the mid-size `qwen3:8b` model, some harnesses
+scored ~1.0 while others scored ~0. If the model were what mattered, they'd all land in the same
+place. They don't.
+
+### Meet the cast (how each harness did)
+
+| Harness | How it did | The one-line takeaway |
+|---|---|---|
+| **aider** | Worked on **every** model (weak, strong, and weird) | The reliable all-rounder — see below |
+| **ollama** (our bare-bones control) | Mediocre-to-good, scaled with the model | A useful "floor": this is what almost-no-harness gets you |
+| **pi / hermes / goose** | Great on one model, **zero** on the others | Powerful but fragile — they only work in the right conditions |
+| **codex** | **Zero. On all 77 runs.** | A perfect example of the harness being the broken part |
+| **claude** (frontier reference) | Perfect (1.0), but costs real money | The quality ceiling — at ~$1.40 a run vs. free locally |
+
+### Three lessons a beginner should take away
+
+**1. A harness can be the broken part — not the model.** `codex` scored **0 out of 77**. But the
+model wasn't too dumb to solve the tasks. `codex` expects the model to "speak" a very specific
+structured language (its tool-call protocol), and these small local models don't speak it — so
+`codex` just throws up its hands (`"unsupported tool call"`) and produces nothing. Same model in
+`aider` solves the task fine. This is *exactly* the blind spot ordinary benchmarks miss: they'd
+blame the model, when the harness is what failed.
+
+**2. How a model *talks* can break a harness — not just how smart it is.** Two of our models
+(`deepseek-r1`) "think out loud" — they narrate their reasoning in `<think>…</think>` before
+answering. Harnesses with a picky parser choke on that narration and score **0**, while the same
+harnesses hit ~1.0 on `qwen3:8b`, which just gives a clean answer. Only the tolerant harnesses
+(`aider`, `ollama`) shrugged off the thinking-out-loud and still got the work done. Lesson: a good
+harness has to cope with *messy* model output, not just *smart* model output. That robustness is
+why **aider** was the standout — it's the only lean harness that cleared every model we threw at it.
+
+**3. The safety gate isn't decorative — it fired.** Remember Safety multiplies the whole score to 0
+if a harness breaks a rule? It caught more than the dummy baseline this time. Even `aider`, our best
+performer, occasionally wrote somewhere it shouldn't and got a run zeroed. A harness that *finishes
+the task* can still lose the whole run to a boundary violation — which is precisely what you want a
+safety gate to surface, instead of letting a good result hide a rule-break.
+
+### And don't forget cost & time
+
+"It worked" isn't the whole picture. `goose` looked great on one model — but **timed out 18 times**
+getting there (it kept retrying tasks it couldn't finish in the time budget). And `claude` was
+flawless but costs real money per run, while the local harnesses are free. Crucible always shows you
+the bill next to the grade, so a slow or pricey "win" can't masquerade as a cheap one.
+
+---
+
+## 10. Want to test your own harness or task?
 
 It's deliberately simple:
 
@@ -192,7 +248,7 @@ It's deliberately simple:
 
 ---
 
-## 10. Mini-glossary
+## 11. Mini-glossary
 
 - **Model** — the raw AI (e.g. `qwen3:8b`, Claude). Produces text; forgets between calls.
 - **Harness** — the scaffolding that turns a model into an agent (tools, loop, memory, safety).
@@ -205,7 +261,7 @@ It's deliberately simple:
 
 ---
 
-## 11. Go deeper
+## 12. Go deeper
 
 - [`crucible/README.md`](../crucible/README.md) — the technical overview.
 - [`crucible/SPEC.md`](../crucible/SPEC.md) — the exact, portable benchmark rules.
