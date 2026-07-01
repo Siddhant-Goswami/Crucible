@@ -105,7 +105,7 @@ don't mistake luck for skill.
 | Path | What it is |
 |---|---|
 | `loop.sh` | the bounded act→verify→repeat loop (the heart of everything) |
-| `adapters/*.sh` | one small script per harness (`mock`, `ollama`, `pi`, `hermes`, `goose`, `claude`) — the "plug" that lets Crucible drive that harness |
+| `adapters/*.sh` | one small script per harness (`mock`, `ollama`, `pi`, `hermes`, `goose`, `codex`, `aider`, `claude`) — the "plug" that lets Crucible drive that harness |
 | `tasks/*` and `crucible/tasks/*` | the problems harnesses are tested on (each is a folder with a goal + a checker) |
 | `crucible/bench.sh` | runs the whole benchmark and prints the scorecard |
 | `crucible/report.js` | turns raw results into the readable scorecard |
@@ -123,6 +123,7 @@ don't mistake luck for skill.
   ```bash
   ollama pull deepseek-r1:1.5b
   ollama pull qwen3:8b
+  ollama pull deepseek-r1:8b
   ```
 - (Optional) the **`claude`** CLI if you want the frontier comparison.
 

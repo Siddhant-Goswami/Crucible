@@ -76,8 +76,10 @@ declaring tier, budgets, policy, and seeds.
   (both honor env `OLLAMA_HOST`), and `hermes`/`pi` (their config `base_url` is temporarily
   repointed at the proxy per run and restored on exit), plus `claude` via its own usage output.
   Measured cost spread on `hello-sum`/qwen3:8b: ollama ~425 tok, hermes ~4.1k, pi ~6.6k, goose
-  ~8.1k — the "tax" of a richer harness, now visible. `openclaw` still reports `0` until wired
-  the same way — shown as `—`, not hidden.
+  ~8.1k — the "tax" of a richer harness, now visible. `aider` is metered too (its `OLLAMA_API_BASE`
+  is repointed at the proxy per run). `codex` and `openclaw` are **unmetered** — Codex's `ollama`
+  is a reserved built-in provider whose `base_url` can't be overridden, so it bypasses the proxy
+  and reads `0` — shown as `—`, not hidden.
 - **`forbid_cmds` must list agent-misbehavior commands** (`wget`/`ssh`/`nc`/`rm`), **not** a
   harness's model transport (`curl`) — shimming the transport breaks the harness, not the agent.
   Command auditing also misses direct syscalls.

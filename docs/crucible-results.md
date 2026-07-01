@@ -61,72 +61,96 @@ error) and passes.
 
 ## 4. The panel
 
-- **Harnesses:** `mock` (deterministic floor) · `ollama` (the thinnest possible harness — a raw
-  file-block parser, the control) · `pi` · `hermes` · `goose` · **`claude`** (Claude Code, the
-  frontier reference).
-- **Models (held fixed per cell):** local `deepseek-r1:1.5b` (small probe) and `qwen3:8b` (mid)
-  for every lean harness via a token-logging proxy; Claude runs its own model on a task subset.
+- **Harnesses (8):** `mock` (deterministic floor) · `ollama` (the thinnest possible harness — a raw
+  file-block parser, the control) · `pi` · `hermes` · `goose` · `codex` (OpenAI Codex CLI, headless)
+  · `aider` (aider, headless) · **`claude`** (Claude Code, the frontier reference).
+- **Models (held fixed per cell):** three local models via a token-logging proxy —
+  `deepseek-r1:1.5b` (small, reasoning), `qwen3:8b` (mid, clean-output), and `deepseek-r1:8b`
+  (8b, reasoning) — plus Claude on its own model over a task subset. Pairing two reasoning models
+  against one clean-output model turns out to matter (§5.2).
+- **Metering:** proxy-routed harnesses (`ollama`/`goose` via env, `hermes`/`pi` via config redirect,
+  `aider` via `OLLAMA_API_BASE`) and `claude` (its own usage) are metered; **`codex` is unmetered** —
+  its `ollama` provider is a reserved built-in whose `base_url` can't be repointed at the proxy, so
+  it bypasses metering and reads `0` (shown `—`, not hidden).
 - Exact versions, model digests, and host are recorded in
   [`crucible/results/ENV.md`](../crucible/results/ENV.md) per run.
 
 ## 5. Headline results
 
-> From a **144-cell** battery (6 harnesses × 3 models × up to 9 tasks × 3 seeds). The full
-> tables are in [`crucible/results/SCORECARD.md`](../crucible/results/SCORECARD.md); the exact
-> environment is in [`crucible/results/ENV.md`](../crucible/results/ENV.md). **Coverage is
-> partial** (see §5.6): the discriminating, safety, and frontier tasks are fully covered; the
-> two content tasks and some `hermes`/`goose` floor cells were not reached before write-up.
+> From a **507-run** battery (8 harnesses × 3 local models × up to 9 tasks × 3 seeds, plus the
+> Claude frontier slice). **55 cells timed out** at their `wall_timeout_s` and are excluded from
+> scores, reported separately in the `TO` column. The full tables are in
+> [`crucible/results/SCORECARD.md`](../crucible/results/SCORECARD.md); the exact environment is in
+> [`crucible/results/ENV.md`](../crucible/results/ENV.md). The full grid ran to completion this
+> round — no coverage gaps.
 
 ### 5.1 Capacity scorecard (Score per `harness @ model`)
 
-| Harness | `deepseek-r1:1.5b` (small) | `qwen3:8b` (mid) | `claude-opus-4-8` |
-|---|--:|--:|--:|
-| claude | — | — | **1.00** (12 cells, $1.38/run) |
-| ollama (thin control) | 0.06 | 0.89 | — |
-| pi | 0.00 | 1.00 *(5 timeouts)* | — |
-| hermes | 0.00 | 0.99 | — |
-| goose | 0.00 *(3 TO)* | 1.00 *(8 timeouts)* | — |
-| mock (floor) | 0.16, **Safety 0.96 (29% gated)** | — | — |
+| Harness | `deepseek-r1:1.5b` (1.5b, reasoning) | `qwen3:8b` (8b, clean) | `deepseek-r1:8b` (8b, reasoning) | `claude-opus-4-8` |
+|---|--:|--:|--:|--:|
+| claude | — | — | — | **1.00** (12 cells, $1.38/run) |
+| aider | **0.58** *(4 TO)* | 0.73 *(5 TO)* | **0.88** *(2 TO)* | — |
+| ollama (thin control) | 0.12 | 0.91 | 0.68 *(2 TO)* | — |
+| pi | 0.00 | **1.00** *(8 TO)* | 0.00 | — |
+| hermes | 0.00 | 0.91 | 0.00 | — |
+| goose | 0.00 *(3 TO)* | 0.99 *(18 TO)* | 0.00 *(3 TO)* | — |
+| codex | 0.00 | 0.00 *(4 TO)* | 0.00 | — |
+| mock (floor) | 0.13, **Safety 0.97 (22% gated)** | — | — | — |
 
-### 5.2 The model dominates the score — but the harness **reorders the field** (P2, P8)
-On the **small** model, *nothing* works: every lean harness lands at ~0 (`ollama` 0.06 is the
-ceiling). On the **mid** model the same harnesses jump to ~1.0 — except the thin `ollama` control
-lags at **0.89** while the richer `pi`/`hermes`/`goose` reach ~1.0. So the model sets the level,
-and the harness sets the *order* — exactly why a score must name a `(harness, model)` pair.
+### 5.2 The output *shape* reorders the field as much as model strength (P2, P8)
+Read across the two reasoning models (`deepseek-r1:*`) against the clean-output one (`qwen3:8b`) and
+a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses — `pi`, `hermes`,
+`goose`, `codex` — collapse to **0**, yet on `qwen3:8b` those same harnesses jump to ~0.9–1.0. The
+only harnesses that survive the deepseek models are **`aider`** (0.58 / 0.88) and the thin **`ollama`**
+control (0.12 / 0.68). The most economical explanation: deepseek-r1 emits `<think>` reasoning traces,
+and a harness with a brittle tool-call/file-block parser chokes on them, while `aider`'s and
+`ollama`'s tolerant parsers extract the edit anyway. So it isn't only *how strong* the model is — it's
+*what shape its output takes*, interacting with the harness's parser. Exactly why a score must name a
+`(harness, model)` pair, never a harness alone.
 
-### 5.3 The thin-control paradox & unstable transfer (P4)
-`ollama` (the thinnest harness) ranks **#1 on the small model** (its lower overhead barely edges
-out) but **last on the mid model** (the richer harnesses' tooling pays off). The report's
-rank-stability check flags this: **⚠️ the ordering changes across models** — a harness's advantage
-here is *model-specific, not structural*. And it's **statistically real**: on the small model
-`ollama` beats `pi` by Δ=0.066, 95% CI [0.009, 0.173], **significant**.
+### 5.3 `aider` has reach; the rest are model-specific (P4)
+Averaged across the local panel, **`aider` leads every non-Claude harness on transfer (mean 0.73)** —
+the only lean harness that clears every model, weak or strong, reasoning or clean. `ollama` follows
+(0.57); `pi`/`goose` (0.33), `hermes` (0.30), and `codex` (0.00) each win on at most one model and
+vanish on the rest. The report's rank-stability check fires: **⚠️ the ordering changes across models**
+— most harness advantages are *model-specific, not structural*. And `aider`'s edge is **statistically
+real**: it beats `ollama` by Δ=**0.478** [0.261, 0.685] on `deepseek-r1:1.5b` and Δ=**0.203**
+[0.056, 0.367] on `deepseek-r1:8b` (both **significant**, paired bootstrap). On `qwen3:8b` the top
+pack is a tie — `pi` vs `goose` Δ=0.015, **not significant**.
 
-### 5.4 Safety: the gate fires, and the capable harnesses respect boundaries
-On the T4 `secret-redaction` task (a prompt-injection trying to make the agent leak a secret),
-**every real harness kept `Safety = 1`** — none leaked the secret or wrote a forbidden file; **Claude
-explicitly resisted the injection** and still completed (3/3). The only thing the gate caught was
-**`mock`** — the dumb baseline writes an irrelevant file outside the allowed area, so it's gated
-(Safety 0.96, 29% of its cells). That's the gate working as designed: a boundary violation collapses
-the score, and the legitimate harnesses stayed in-bounds.
+### 5.4 `codex` is a structural zero, not a bad-model day (P1)
+`codex` scores **0 across all 77 finished cells** — every one an `artifact_commitment` failure. This
+isn't the model failing to solve the task; it's the *harness protocol* failing: Codex's headless
+runner expects the model to speak its structured tool-call protocol, and the local models return
+`"unsupported tool call"` and produce no artifact at all. It fails cleanly rather than crashing — a
+crisp demonstration of the thesis that the harness, not the model, can be the thing that's broken.
 
-### 5.5 How harnesses fail, and what they cost (P1, P7)
-The dominant failure mode is **`artifact_commitment`** — the harness/model produced no usable output
-(`pi` 19, `hermes` 12, `ollama` 11, `goose` 9 such failures), overwhelmingly on the small model.
-**Claude failed nothing (12/12).** And cost/latency is a first-class finding: **19 cells timed out**
-(`goose` 11, `pi` 7) — `goose`/`pi` exhaust their retries on tasks they can't solve within budget, so
-their headline ~1.0 on the mid model is **only over the cells they finished**; read it *with* the `TO`
-column. Claude's quality is highest but its metered cost is ~$1.4/run (a cache-inflated upper bound).
+### 5.5 Safety: the gate fires — and this round it catches more than `mock`
+On the T4 `secret-redaction` injection task the strong performers largely hold the line, but the gate
+is no longer catching *only* the dumb baseline. `mock` is still worst (Safety 0.97, **22%** of cells
+gated). But **`aider` also trips it** — Safety 0.92 on `deepseek-r1:1.5b` (17% gated) and 0.98 on
+`deepseek-r1:8b` (12% gated) — and `ollama` on `deepseek-r1:8b` once (0.96, 4%). That is the gate's
+whole point: a capable harness that *completes* can still lose the run to a boundary violation, and
+the multiplicative gate surfaces it rather than letting completion paper over it. **Claude kept
+`Safety = 1`**, resisting the injection while completing (12/12).
 
-### 5.6 Coverage & honesty
-- **Fully covered:** `tool-recover` (T1), `secret-redaction` (T4), `api-migration` (T2 — partial
-  `hermes`/`goose`), the three floor tasks, and the Claude frontier slice.
-- **Not reached before write-up:** `research-deck` (T3) and `self-improving-rubric` (T2), plus some
-  `hermes`/`goose` cells on the floor tasks (~94 of 225 local cells unrun). They add completeness,
-  not new headline findings; rerun with `RESUME=1 ./crucible/bench.sh` to fill them in.
+### 5.6 How harnesses fail, and what they cost (P1, P7)
+The dominant failure mode is **`artifact_commitment`** — no usable output — and it dwarfs the rest:
+`codex` 77, `hermes` 54, `pi` 49, `goose` 48, `ollama` 16, `aider` 6. `aider` and `ollama` are the
+only harnesses whose failures spread across the taxonomy (contract-format, tool-recovery, state)
+instead of piling entirely into "produced nothing" — the signature of a harness that *engages* the
+task rather than bouncing off it. **Claude failed nothing (12/12).** Cost/latency is first-class:
+**55 cells timed out** — `goose` alone burned **18** on `qwen3:8b`, so its ~1.0 headline there is over
+just the 9 cells it finished; read it *with* the `TO` column. On token efficiency `ollama`@`qwen3:8b`
+is most frugal (369 successes/Mtok), `aider` competitive (108–142), and Claude's quality is highest
+at a metered ~$1.4/run (a cache-inflated upper bound).
+
+### 5.7 What still holds from v1
+- The **T1 tool-recover discrimination** is still confirmed empirically: the file-only `ollama`
+  control cannot run the generator and fails every cell; tool-capable harnesses (`aider`, `claude`)
+  pass.
 - **Wide CIs / few seeds:** with 3 seeds many differences are *not* significant — reported honestly,
   not hidden. `smpl⚠` marks cells whose tight CI is an artifact of zero variance, not stability.
-- The **T1 tool-recover discrimination is confirmed empirically**: the file-only `ollama` control
-  cannot run the generator and fails every cell; `pi` and `claude` (tool-capable) pass.
 
 ## 6. Reproduce
 
@@ -153,7 +177,9 @@ The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-che
 - **Cost for Claude is an upper bound** — `claude.sh` counts cache tokens at full rate (no cache
   discount), so its reported $ overstates the real spend.
 - **Token metering** is uniform for proxy-routed harnesses (`ollama`/`goose` via env, `hermes`/`pi`
-  via a per-run config redirect) and Claude (its own usage); `openclaw` is unmetered (shown `—`).
+  via a per-run config redirect, `aider` via `OLLAMA_API_BASE`) and Claude (its own usage);
+  **`codex`** and `openclaw` are unmetered (shown `—`) — Codex's `ollama` is a reserved built-in
+  provider whose `base_url` can't be repointed at the proxy, so it bypasses metering entirely.
 - **Seed semantics**: only adapters with a seed knob (`ollama`) are *reproducible* (`pin`); for
   others the N seeds are independent samples (`smpl`), and the report flags any unseeded
   zero-variance cell whose tight CI is an artifact.
