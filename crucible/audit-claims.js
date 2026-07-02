@@ -15,9 +15,23 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const taskmeta = require('./lib/taskmeta');
+const ROOT = path.join(__dirname, '..');
 const LEDGER = process.argv[2] || path.join(__dirname, 'results', 'battery.jsonl');
 if (!fs.existsSync(LEDGER)) { console.error(`ledger not found: ${LEDGER} (run crucible/bench.sh first)`); process.exit(2); }
 const rows = fs.readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+
+// tier lookup (from task.yaml, same source report.js uses) + best-local-harness goodput per (model, tier)
+const TASK_DIRS = ['tasks', 'crucible/tasks'];
+const tierOf = task => { for (const d of TASK_DIRS) { const m = taskmeta.load(path.join(ROOT, d, task)); if (m && m.tier) return String(m.tier); } return '?'; };
+const bestLocalGP = (model, tier) => {
+  let best = 0;
+  for (const a of [...new Set(rows.map(r => r.adapter))]) {
+    const rs = rows.filter(r => r.adapter === a && r.model === model && tierOf(r.task) === tier);
+    if (rs.length) best = Math.max(best, rs.reduce((s, r) => s + (r.score ?? 0), 0) / rs.length);
+  }
+  return best;
+};
 
 // --- data helpers -------------------------------------------------------------
 const sel = (a, m, task) => rows.filter(r =>
@@ -78,6 +92,20 @@ claim('aider has reach: goodput>0.05 on all three local models', aiderReach,
 // 7. codex is a structural zero across every finished local cell.
 const codexPass = LOCAL.reduce((s, m) => s + passes(sel('codex', m)), 0);
 claim('codex passes 0 finished local cells (structural protocol zero)', codexPass === 0, `${codexPass} passes`);
+
+// --- routing conclusions (§4 of the scorecard) — guard the local-vs-cloud verdicts ---
+// 8. With qwen3:8b, every tier is clearable LOCALLY by some harness (best-local goodput ≥ 0.7) —
+//    so the routing verdict "stay local on qwen3" holds across all tiers.
+const qwenTiers = ['T0', 'T1', 'T2', 'T3', 'T4'];
+const qwenClears = qwenTiers.every(t => bestLocalGP('qwen3:8b', t) >= 0.7);
+claim('qwen3:8b clears every tier locally (best-local goodput ≥ 0.7) → stay-local verdict',
+  qwenClears, qwenTiers.map(t => `${t}:${bestLocalGP('qwen3:8b', t).toFixed(2)}`).join(' '));
+
+// 9. T1 tool-recovery must ESCALATE on the weak/8b reasoning models: no local harness clears 0.5.
+for (const m of ['deepseek-r1:1.5b', 'deepseek-r1:8b']) {
+  const gp = bestLocalGP(m, 'T1');
+  claim(`${m}: T1 tool-recover needs cloud (best-local goodput < 0.5)`, gp < 0.5, `best-local=${gp.toFixed(2)}`);
+}
 
 // --- report -------------------------------------------------------------------
 let failed = 0;

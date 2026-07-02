@@ -15,7 +15,7 @@ same score *conditional on the run finishing* (the old headline) — read it onl
 |---|---|--:|--:|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|--:|
 | aider | deepseek-r1:1.5b | 23 | 4 | 85% | smpl | **0.49** [0.31, 0.66] | 0.58 | 0.57 | 0.66 | 0.54 | 0.92 | 17% | $0 | 11 |
 | aider | deepseek-r1:8b | 25 | 2 | 93% | smpl | **0.81** [0.67, 0.94] | 0.88 | 0.88 | 0.9 | 0.88 | 0.98 | 12% | $0 | 108 |
-| aider | qwen3:8b | 22 | 5 | 81% | smpl | **0.59** [0.41, 0.77] | 0.73 | 0.73 | 0.72 | 0.73 | 1 | 0% | $0 | 142 |
+| aider | qwen3:8b | 22 | 5 | 81% | smpl | **0.59** [0.41, 0.78] | 0.73 | 0.73 | 0.72 | 0.73 | 1 | 0% | $0 | 142 |
 | claude | claude-opus-4-8 | 12 |  | 100% | smpl⚠ | **1** [1, 1] | 1 | 1 | 1 | 1 | 1 | 0% | $1.3765 | 4 |
 | codex | deepseek-r1:1.5b | 27 |  | 100% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | — |
 | codex | deepseek-r1:8b | 27 |  | 100% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | — |
@@ -27,12 +27,12 @@ same score *conditional on the run finishing* (the old headline) — read it onl
 | hermes | deepseek-r1:8b | 27 |  | 100% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | — |
 | hermes | qwen3:8b | 27 |  | 100% | smpl | **0.91** [0.81, 0.98] | 0.91 | 0.93 | 0.9 | 0.87 | 1 | 0% | $0 | 62 |
 | mock | baseline | 9 |  | 100% | smpl | **0.13** [0.01, 0.35] | 0.13 | 0.11 | 0.19 | 0.11 | 0.97 | 22% | $0 | — |
-| ollama | deepseek-r1:1.5b | 27 |  | 100% | pin | **0.12** [0.02, 0.24] | 0.12 | 0.11 | 0.17 | 0.11 | 1 | 0% | $0 | 11 |
+| ollama | deepseek-r1:1.5b | 27 |  | 100% | pin | **0.12** [0.02, 0.26] | 0.12 | 0.11 | 0.17 | 0.11 | 1 | 0% | $0 | 11 |
 | ollama | deepseek-r1:8b | 25 | 2 | 93% | pin | **0.63** [0.46, 0.8] | 0.68 | 0.73 | 0.67 | 0.73 | 0.96 | 4% | $0 | 125 |
-| ollama | qwen3:8b | 26 | 1 | 96% | pin | **0.88** [0.74, 0.99] | 0.91 | 0.92 | 0.9 | 0.9 | 1 | 0% | $0 | 369 |
+| ollama | qwen3:8b | 26 | 1 | 96% | pin | **0.88** [0.76, 0.99] | 0.91 | 0.92 | 0.9 | 0.9 | 1 | 0% | $0 | 369 |
 | pi | deepseek-r1:1.5b | 25 | 2 | 93% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | 0 |
 | pi | deepseek-r1:8b | 24 | 3 | 89% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | 0 |
-| pi | qwen3:8b | 19 | 8 | 70% | smpl | **0.7** [0.55, 0.85] | 1 | 1 | 0.98 | 1 | 1 | 0% | $0 | 67 |
+| pi | qwen3:8b | 19 | 8 | 70% | smpl | **0.7** [0.52, 0.88] | 1 | 1 | 0.98 | 1 | 1 | 0% | $0 | 67 |
 
 _**TO** = cells that exceeded their `wall_timeout_s` (killed before finishing) — 55 total. Each counts as a **0 in Goodput** and lowers **Rel%**; **Score|fin, Compl, Path, State, Safety, Cost, Succ/Mtok describe only the finished runs**. A high Score|fin with a low Rel% is a harness that does well *when* it finishes but often doesn't — read the two together._
 
@@ -57,7 +57,70 @@ T0/T2 edits and useless on T1 tool-recovery; that split is the routing decision.
 
 _Tiers: **T0** floor bug-fix · **T1** tool-use + recovery · **T2** long-horizon/stateful · **T3** evidence/artifact · **T4** safety/governance. `[n]` = attempts pooled (all models × seeds, timeouts included)._
 
-## 3. Cross-model transfer (reach test, P4)
+## 3. Efficiency & cost — the routing economics (P7)
+
+What a given quality *costs*. **Latency** is p50 wall time per run (**hardware-conditional** —
+see ENV.md; local numbers are this box, not a datacenter). **Throughput** is tokens/sec over
+model-active time. **Marginal $** is what you pay here ($0 local = your electricity only);
+**Cloud-equiv $** is what the *same model* would cost on a hosted endpoint (OpenRouter for OSS,
+list price for Claude) — the apples-to-apples figure for local-vs-cloud routing.
+
+| Harness | Model | n | Latency p50 (s) | Throughput (tok/s) | Marginal $/run | Cloud-equiv $/run |
+|---|---|--:|--:|--:|--:|--:|
+| aider | deepseek-r1:1.5b | 23 | 105.7 | 278 | $0 | $0.0008 |
+| aider | deepseek-r1:8b | 25 | 46.6 | 74 | $0 | $0.0003 |
+| aider | qwen3:8b | 22 | 57.9 | 42 | $0 | $0.0004 |
+| claude | claude-opus-4-8 | 12 | 39.4 | 5776 | $1.3765 | $1.3765 |
+| codex | deepseek-r1:1.5b | 27 | 153.2 | 0 | $0 | $0.0000 |
+| codex | deepseek-r1:8b | 27 | 157.7 | 0 | $0 | $0.0000 |
+| codex | qwen3:8b | 23 | 273.1 | 0 | $0 | $0.0000 |
+| goose | deepseek-r1:1.5b | 24 | 89.9 | 191 | $0 | $0.0003 |
+| goose | deepseek-r1:8b | 24 | 288.1 | 57 | $0 | $0.0006 |
+| goose | qwen3:8b | 9 | 254.3 | 79 | $0 | $0.0010 |
+| hermes | deepseek-r1:1.5b | 27 | 22.3 | 0 | $0 | $0.0000 |
+| hermes | deepseek-r1:8b | 27 | 22.2 | 0 | $0 | $0.0000 |
+| hermes | qwen3:8b | 27 | 100.2 | 73 | $0 | $0.0008 |
+| mock | baseline | 9 | 1.4 | 0 | $0 | — |
+| ollama | deepseek-r1:1.5b | 27 | 56.5 | 167 | $0 | $0.0002 |
+| ollama | deepseek-r1:8b | 25 | 50.9 | 52 | $0 | $0.0002 |
+| ollama | qwen3:8b | 26 | 9.0 | 74 | $0 | $0.0002 |
+| pi | deepseek-r1:1.5b | 25 | 51.7 | 165 | $0 | $0.0002 |
+| pi | deepseek-r1:8b | 24 | 167.3 | 61 | $0 | $0.0004 |
+| pi | qwen3:8b | 19 | 105.3 | 99 | $0 | $0.0008 |
+
+_Local **Marginal $** is $0 (your box) but you pay it in **Latency** + hardware; **Cloud-equiv $** prices the same model hosted, so you can weigh "free-but-slow local" vs "cheap-but-metered cloud" vs Claude. OSS cloud-equiv prices are approximate (`pricing.json`, marked verify). `codex`/`openclaw` are unmetered upstream, so their token-derived figures read `$0`/`—` — a metering blind spot, not a real zero._
+
+## 4. Routing table — when to use which (harness, model), local vs cloud
+
+For each task tier: the best **local** `(harness @ model)` by Goodput and what it costs in
+latency, vs the **cloud** reference (Claude). *Verdict*: **✅ local** = a local pair clears the
+bar (Goodput ≥ 0.7 at ≥ 80% reliability); **☁️ escalate** = cloud beats the best local by ≥ 0.3
+Goodput; **⚠️ hard** = nothing clears the bar here. This is the signal difficulty-based routers
+(RouteLLM, Hybrid-LLM) lack: route on the *task's tool/capability tier*, not just prompt length.
+
+| Tier | Best local (harness@model) | local Goodput | Rel% | p50 lat (s) | Cloud (claude) Goodput | Cloud $/run | Verdict |
+|---|---|--:|--:|--:|--:|--:|:--|
+| T0 floor | aider@qwen3:8b | 1 [9] | 100% | 54.1 | — | — | ✅ local — aider@qwen3:8b |
+| T1 tool-recover | pi@qwen3:8b | 1 [3] | 100% | 110.5 | 1 | $1.39 | ✅ local — pi@qwen3:8b |
+| T2 long-horizon | aider@deepseek-r1:8b | 1 [9] | 100% | 37.5 | 1 | $1.70 | ✅ local — aider@deepseek-r1:8b |
+| T3 evidence | ollama@qwen3:8b | 1 [3] | 100% | 55.6 | — | — | ✅ local — ollama@qwen3:8b |
+| T4 safety | ollama@qwen3:8b | 1 [3] | 100% | 5.5 | 1 | $0.72 | ✅ local — ollama@qwen3:8b |
+
+_`[n]` = attempts behind the best-local pick. Where local ties cloud on Goodput the verdict is **✅ local** — the routing win is the **cost**: local matches quality here at ~$0 and modest latency while Claude runs **$0.72–$1.70/run**. The catch a difficulty-router misses: the winning pair is tier-specific (`pi@qwen3` for T1, `aider@deepseek-r1:8b` for T2) — you need this table to pick it, not prompt length._
+
+**If your local model is fixed** (it usually is — whatever fits your GPU), which tiers still need
+cloud? Best achievable Goodput on each local model per tier (best harness for that pair); **☁️**
+marks a tier below the 0.7 bar — *no* local harness clears it on that model, so route it to cloud.
+
+| Local model | T0 floor | T1 tool-recover | T2 long-horizon | T3 evidence | T4 safety |
+|---|--:|--:|--:|--:|--:|
+| deepseek-r1:1.5b | ☁️ 0.69 aider | ☁️ 0.02 aider | 0.7 aider | ☁️ 0.04 ollama | ☁️ 0.22 aider |
+| qwen3:8b | 1 aider | 1 pi | 0.99 ollama | 1 ollama | 1 ollama |
+| deepseek-r1:8b | 0.78 aider | ☁️ 0.13 ollama | 1 aider | 1 aider | 0.92 aider |
+
+_Cloud (Claude) ran only a discriminating subset of tiers, so some cloud cells above are `—` (not run), not 0. Latency is this host's (ENV.md), not a datacenter's. Thresholds (0.7 / 0.8 / 0.3) are conventions — adjust to your quality bar._
+
+## 5. Cross-model transfer (reach test, P4)
 
 Mean **Goodput** per harness across the model panel; a harness whose advantage holds across
 models has *reach*, one whose ranking flips was model-specific. (Goodput, not conditional
@@ -81,15 +144,15 @@ Score, so harnesses that reach the top only by timing out on the hard cells cann
 
 **Rank stability:** ⚠️ ordering changes across models — at least one harness advantage is model-specific, not structural.
 
-## 4. Significance (paired bootstrap on shared seeds, P9)
+## 6. Significance (paired bootstrap on shared seeds, P9)
 
 _Paired on goodput: a timed-out (task, seed) contributes a 0, so reliability differences count._
 
-- **deepseek-r1:1.5b:** aider vs ollama — Δ=0.37 [0.155, 0.593] → **significant** (n=27 shared cells).
-- **qwen3:8b:** hermes vs ollama — Δ=0.029 [-0.022, 0.111] → not significant (n=27 shared cells).
-- **deepseek-r1:8b:** aider vs ollama — Δ=0.183 [0.02, 0.355] → **significant** (n=27 shared cells).
+- **deepseek-r1:1.5b:** aider vs ollama — Δ=0.37 [0.154, 0.589] → **significant** (n=27 shared cells).
+- **qwen3:8b:** hermes vs ollama — Δ=0.029 [-0.022, 0.115] → not significant (n=27 shared cells).
+- **deepseek-r1:8b:** aider vs ollama — Δ=0.183 [0.02, 0.369] → **significant** (n=27 shared cells).
 
-## 5. Failure-mode breakdown (execution-alignment taxonomy, P1)
+## 7. Failure-mode breakdown (execution-alignment taxonomy, P1)
 
 _`timeout` is a delivery failure counted here alongside the alignment taxonomy (it is a 0 in Goodput)._
 
@@ -104,7 +167,7 @@ _`timeout` is a delivery failure counted here alongside the alignment taxonomy (
 | codex | 0/81 | 0 | 0 | 0 | 77 | 0 | 4 |
 | aider | 49/81 | 8 | 3 | 1 | 6 | 3 | 11 |
 
-## 6. Reading this honestly
+## 8. Reading this honestly
 
 - **Goodput is the headline** (timeouts = 0); **Score|fin** is conditional on finishing. A big gap between them, or a low **Rel%**, means the harness is unreliable — do not read Score|fin alone (P1/P7).
 - **Score names a (harness, model) pair**, never a harness alone (P2). Compare down a model column.

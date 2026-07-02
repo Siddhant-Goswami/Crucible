@@ -31,7 +31,7 @@ const rows = fs.readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean).map(JSO
 if (!rows.length) { console.error('empty ledger: ' + LEDGER); process.exit(1); }
 
 // ---- helpers -----------------------------------------------------------------
-const { mean, bootCI, pairedBoot, priceRun } = require('./lib/stats');
+const { mean, median, bootCI, pairedBoot, priceRun, priceRunCloud } = require('./lib/stats');
 const r2 = x => Math.round(x * 100) / 100;
 const r3 = x => Math.round(x * 1000) / 1000;
 const pct = x => Math.round(x * 100);
@@ -72,14 +72,19 @@ function agg(runs) {
   const succ = runs.filter(r => r.result === 'passed');
   const tok = runs.reduce((s, r) => s + (r.tokens_in || 0) + (r.tokens_out || 0), 0);
   const cost = runs.reduce((s, r) => s + priceRun(r, pricing), 0);
+  const actMs = runs.reduce((s, r) => s + (r.act_ms_total || 0), 0);
+  const cloudVals = runs.map(r => priceRunCloud(r, pricing));
+  const cloudCost = cloudVals.some(v => v != null) ? cloudVals.reduce((s, v) => s + (v || 0), 0) : null;
   return {
     n: runs.length,
     score: mean(scores), ciLo: ci[0], ciHi: ci[1],
     completion: mean(f('completion')), path: mean(f('path')), state: mean(f('state')),
     safety: mean(runs.map(r => Math.min(r.safety?.tool_sar ?? 1, r.safety?.resource_sar ?? 1, r.safety?.info_sar ?? 1))),
     gatedPct: runs.length ? 100 * runs.filter(r => r.safety?.gated).length / runs.length : 0,
-    tokens: tok, cost,
+    tokens: tok, cost, cloudCost,
     succPerMtok: tok ? (succ.length / (tok / 1e6)) : null,
+    latency: median(f('wall_ms')),                                 // p50 wall ms/run (hardware-conditional)
+    tokPerSec: actMs > 0 ? tok / (actMs / 1000) : null,            // throughput over model-active time
     wall: mean(f('wall_ms')),
     seeded: runs.some(r => r.seeded),                              // adapter pinned the RNG seed
     multiSeed: new Set(runs.map(r => r.seed)).size > 1,
@@ -156,8 +161,97 @@ md.push('');
 md.push('_Tiers: **T0** floor bug-fix · **T1** tool-use + recovery · **T2** long-horizon/stateful · **T3** evidence/artifact · **T4** safety/governance. `[n]` = attempts pooled (all models × seeds, timeouts included)._');
 md.push('');
 
-// 3. Cross-model transfer / rank stability (on GOODPUT — so a flaky harness can't out-rank a reliable one)
-md.push('## 3. Cross-model transfer (reach test, P4)');
+// 3. Efficiency & cost (routing economics)
+md.push('## 3. Efficiency & cost — the routing economics (P7)');
+md.push('');
+md.push('What a given quality *costs*. **Latency** is p50 wall time per run (**hardware-conditional** —');
+md.push('see ENV.md; local numbers are this box, not a datacenter). **Throughput** is tokens/sec over');
+md.push('model-active time. **Marginal $** is what you pay here ($0 local = your electricity only);');
+md.push('**Cloud-equiv $** is what the *same model* would cost on a hosted endpoint (OpenRouter for OSS,');
+md.push('list price for Claude) — the apples-to-apples figure for local-vs-cloud routing.');
+md.push('');
+md.push('| Harness | Model | n | Latency p50 (s) | Throughput (tok/s) | Marginal $/run | Cloud-equiv $/run |');
+md.push('|---|---|--:|--:|--:|--:|--:|');
+for (const k of Object.keys(cells).sort()) {
+  const c = cells[k]; const s = agg(c.runs);
+  if (!s.n) { md.push(`| ${c.adapter} | ${c.model} | 0 | — | — | — | — |`); continue; }
+  const lat = (s.latency / 1000).toFixed(1);
+  const tps = s.tokPerSec == null ? '—' : Math.round(s.tokPerSec);
+  const marg = s.cost === 0 ? '$0' : '$' + (s.cost / s.n).toFixed(4);
+  const cloud = s.cloudCost == null ? '—' : '$' + (s.cloudCost / s.n).toFixed(4);
+  md.push(`| ${c.adapter} | ${c.model} | ${s.n} | ${lat} | ${tps} | ${marg} | ${cloud} |`);
+}
+md.push('');
+md.push('_Local **Marginal $** is $0 (your box) but you pay it in **Latency** + hardware; **Cloud-equiv $** prices the same model hosted, so you can weigh "free-but-slow local" vs "cheap-but-metered cloud" vs Claude. OSS cloud-equiv prices are approximate (`pricing.json`, marked verify). `codex`/`openclaw` are unmetered upstream, so their token-derived figures read `$0`/`—` — a metering blind spot, not a real zero._');
+md.push('');
+
+// 4. Routing table — the deliverable: when to use which (harness, model), local vs cloud
+md.push('## 4. Routing table — when to use which (harness, model), local vs cloud');
+md.push('');
+md.push('For each task tier: the best **local** `(harness @ model)` by Goodput and what it costs in');
+md.push('latency, vs the **cloud** reference (Claude). *Verdict*: **✅ local** = a local pair clears the');
+md.push('bar (Goodput ≥ 0.7 at ≥ 80% reliability); **☁️ escalate** = cloud beats the best local by ≥ 0.3');
+md.push('Goodput; **⚠️ hard** = nothing clears the bar here. This is the signal difficulty-based routers');
+md.push('(RouteLLM, Hybrid-LLM) lack: route on the *task\'s tool/capability tier*, not just prompt length.');
+md.push('');
+const LOCAL_MODELS = models.filter(m => !m.startsWith('claude'));
+const CLOUD_MODEL = models.find(m => m.startsWith('claude'));
+const tierRows = rows.reduce((acc, r) => { (acc[tierOf(r.task)] ||= []).push(r); return acc; }, {});
+function cellGoodput(adapter, model, tier) {
+  const rs = (tierRows[tier] || []).filter(r => r.adapter === adapter && r.model === model);
+  if (!rs.length) return null;
+  const fin = rs.filter(r => !r.timed_out);
+  return {
+    gp: mean(rs.map(r => r.score ?? 0)), rel: rs.length ? fin.length / rs.length : 0,
+    lat: median(fin.map(r => r.wall_ms || 0)), n: rs.length,
+  };
+}
+const TIER_LABEL = { T0: 'T0 floor', T1: 'T1 tool-recover', T2: 'T2 long-horizon', T3: 'T3 evidence', T4: 'T4 safety' };
+md.push('| Tier | Best local (harness@model) | local Goodput | Rel% | p50 lat (s) | Cloud (claude) Goodput | Cloud $/run | Verdict |');
+md.push('|---|---|--:|--:|--:|--:|--:|:--|');
+for (const t of tiers) {
+  if (t === '?') continue;
+  let best = null, bestKey = '—';
+  for (const a of adapters) for (const m of LOCAL_MODELS) {
+    const g = cellGoodput(a, m, t); if (!g) continue;
+    if (!best || g.gp > best.gp) { best = g; bestKey = `${a}@${m}`; }
+  }
+  const cg = CLOUD_MODEL ? cellGoodput('claude', CLOUD_MODEL, t) : null;
+  const cloudRuns = (tierRows[t] || []).filter(r => r.adapter === 'claude' && !r.timed_out);
+  const cloudPer = cloudRuns.length ? cloudRuns.reduce((s, r) => s + priceRun(r, pricing), 0) / cloudRuns.length : null;
+  let verdict;
+  if (best && best.gp >= 0.7 && best.rel >= 0.8) verdict = `✅ local — ${bestKey}`;
+  else if (cg && best && (cg.gp - best.gp) >= 0.3) verdict = '☁️ escalate to cloud';
+  else if (cg && !best) verdict = '☁️ cloud only';
+  else verdict = `⚠️ hard — best ${bestKey} @ ${best ? r2(best.gp) : '—'}`;
+  md.push(`| ${TIER_LABEL[t] || t} | ${bestKey} | ${best ? r2(best.gp) + ' [' + best.n + ']' : '—'} | ${best ? pct(best.rel) + '%' : '—'} | ${best ? (best.lat / 1000).toFixed(1) : '—'} | ${cg ? r2(cg.gp) : '—'} | ${cloudPer == null ? '—' : '$' + cloudPer.toFixed(2)} | ${verdict} |`);
+}
+md.push('');
+md.push('_`[n]` = attempts behind the best-local pick. Where local ties cloud on Goodput the verdict is **✅ local** — the routing win is the **cost**: local matches quality here at ~$0 and modest latency while Claude runs **$0.72–$1.70/run**. The catch a difficulty-router misses: the winning pair is tier-specific (`pi@qwen3` for T1, `aider@deepseek-r1:8b` for T2) — you need this table to pick it, not prompt length._');
+md.push('');
+// 4b. The other routing question: your local model is fixed (it's what fits your GPU) — which tiers escalate?
+md.push('**If your local model is fixed** (it usually is — whatever fits your GPU), which tiers still need');
+md.push('cloud? Best achievable Goodput on each local model per tier (best harness for that pair); **☁️**');
+md.push('marks a tier below the 0.7 bar — *no* local harness clears it on that model, so route it to cloud.');
+md.push('');
+const rtTiers = tiers.filter(t => t !== '?');
+md.push('| Local model | ' + rtTiers.map(t => TIER_LABEL[t] || t).join(' | ') + ' |');
+md.push('|---|' + rtTiers.map(() => '--:').join('|') + '|');
+for (const m of LOCAL_MODELS) {
+  const cellsForM = rtTiers.map(t => {
+    let bg = null, bk = '';
+    for (const a of adapters) { const g = cellGoodput(a, m, t); if (g && (bg == null || g.gp > bg)) { bg = g.gp; bk = a; } }
+    if (bg == null) return '—';
+    return `${bg >= 0.7 ? '' : '☁️ '}${r2(bg)} ${bk}`;
+  });
+  md.push(`| ${m} | ${cellsForM.join(' | ')} |`);
+}
+md.push('');
+md.push('_Cloud (Claude) ran only a discriminating subset of tiers, so some cloud cells above are `—` (not run), not 0. Latency is this host\'s (ENV.md), not a datacenter\'s. Thresholds (0.7 / 0.8 / 0.3) are conventions — adjust to your quality bar._');
+md.push('');
+
+// 5. Cross-model transfer / rank stability (on GOODPUT — so a flaky harness can't out-rank a reliable one)
+md.push('## 5. Cross-model transfer (reach test, P4)');
 md.push('');
 md.push('Mean **Goodput** per harness across the model panel; a harness whose advantage holds across');
 md.push('models has *reach*, one whose ranking flips was model-specific. (Goodput, not conditional');
@@ -192,7 +286,7 @@ md.push(`**Rank stability:** ${models.length < 2 ? 'n/a (single model — add a 
 md.push('');
 
 // 4. Significance — top-2 within each model, on GOODPUT (timeouts included as 0)
-md.push('## 4. Significance (paired bootstrap on shared seeds, P9)');
+md.push('## 6. Significance (paired bootstrap on shared seeds, P9)');
 md.push('');
 md.push('_Paired on goodput: a timed-out (task, seed) contributes a 0, so reliability differences count._');
 md.push('');
@@ -216,7 +310,7 @@ if (!comparisons) md.push('- _No comparison possible — a model needs ≥2 mode
 md.push('');
 
 // 5. Failure modes
-md.push('## 5. Failure-mode breakdown (execution-alignment taxonomy, P1)');
+md.push('## 7. Failure-mode breakdown (execution-alignment taxonomy, P1)');
 md.push('');
 md.push('_`timeout` is a delivery failure counted here alongside the alignment taxonomy (it is a 0 in Goodput)._');
 md.push('');
@@ -234,7 +328,7 @@ for (const a of adapters) {
 md.push('');
 
 // 6. Caveats
-md.push('## 6. Reading this honestly');
+md.push('## 8. Reading this honestly');
 md.push('');
 md.push('- **Goodput is the headline** (timeouts = 0); **Score|fin** is conditional on finishing. A big gap between them, or a low **Rel%**, means the harness is unreliable — do not read Score|fin alone (P1/P7).');
 md.push('- **Score names a (harness, model) pair**, never a harness alone (P2). Compare down a model column.');

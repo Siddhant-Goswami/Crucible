@@ -8,7 +8,12 @@
     "claude-sonnet-4-6":    { "in": 3.00,  "out": 15.00, "note": "Anthropic list" },
     "claude-haiku-4-5":     { "in": 1.00,  "out": 5.00,  "note": "Anthropic list" },
     "claude-fable-5":       { "in": 10.00, "out": 50.00, "note": "Anthropic list" },
-    "openrouter/qwen3-8b":  { "in": 0.035, "out": 0.138, "note": "approx OpenRouter, verify" }
+    "openrouter/qwen3-8b":  { "in": 0.035, "out": 0.138, "note": "approx OpenRouter, verify" },
+
+    "_cloud_equiv_note": "Cloud-EQUIVALENT prices, keyed by the ledger's model name (colon form), read by priceRunCloud() for the local-vs-cloud routing economics table. These are what it would cost to run the SAME OSS model on a hosted endpoint (OpenRouter) instead of your own box — approximate, VERIFY before relying on them.",
+    "openrouter/qwen3:8b":        { "in": 0.035, "out": 0.138, "note": "approx OpenRouter Qwen3-8B, verify" },
+    "openrouter/deepseek-r1:8b":  { "in": 0.04,  "out": 0.04,  "note": "approx OpenRouter DeepSeek-R1-Distill-Llama-8B, verify" },
+    "openrouter/deepseek-r1:1.5b":{ "in": 0.018, "out": 0.018, "note": "approx OpenRouter DeepSeek-R1-Distill-Qwen-1.5B, verify" }
   },
   "_adapterModel_note": "Maps each adapter to the model it ACTUALLY runs here. hermes/openclaw/pi/goose are all wired to the same local Ollama qwen3:8b as the ollama adapter, so they price to $0 — the benchmark isolates the harness, not the model. Only claude runs a cloud model.",
   "adapterModel": {

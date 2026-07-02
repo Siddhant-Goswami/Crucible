@@ -25,8 +25,14 @@ function pairedBoot(aByKey, bByKey, B = 2000, rng = Math.random) {
   return { diff: mean(diffs), lo, hi, sig: lo > 0 || hi < 0, n: diffs.length };
 }
 
-// Marginal $ for a run given pricing.json: local models => $0; claude-* keyed directly,
-// other local models keyed as ollama/<model>.
+const median = a => {
+  if (!a.length) return 0;
+  const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+// Marginal $ for a run given pricing.json: local models => $0 (your electricity only); claude-*
+// keyed directly, other local models keyed as ollama/<model>.
 function priceRun(r, pricing) {
   if (!r.model || r.model === 'baseline') return 0;            // floor / local-unknown => $0 (don't alias a real key)
   const key = r.model.startsWith('claude') ? r.model : 'ollama/' + r.model;
@@ -34,4 +40,16 @@ function priceRun(r, pricing) {
   return ((r.tokens_in || 0) * p.in + (r.tokens_out || 0) * p.out) / 1e6;
 }
 
-module.exports = { mean, bootCI, pairedBoot, priceRun };
+// Cloud-EQUIVALENT $ for a run: what it would cost to run this SAME model on a hosted endpoint —
+// the apples-to-apples number for local-vs-cloud routing (local marginal $ is 0 but hides the
+// hardware + latency you actually pay). claude-* price at their own rate; OSS local models price
+// at their OpenRouter-hosted rate (openrouter/<model> in pricing.json). Returns null if unpriced.
+function priceRunCloud(r, pricing) {
+  if (!r.model || r.model === 'baseline') return null;
+  const key = r.model.startsWith('claude') ? r.model : 'openrouter/' + r.model;
+  const p = pricing.models && pricing.models[key];
+  if (!p) return null;
+  return ((r.tokens_in || 0) * p.in + (r.tokens_out || 0) * p.out) / 1e6;
+}
+
+module.exports = { mean, median, bootCI, pairedBoot, priceRun, priceRunCloud };

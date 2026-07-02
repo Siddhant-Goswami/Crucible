@@ -201,6 +201,32 @@ at a metered ~$1.4/run (a cache-inflated upper bound).
 - **Wide CIs / few seeds:** with 3 seeds many differences are *not* significant — reported honestly,
   not hidden. `smpl⚠` marks cells whose tight CI is an artifact of zero variance, not stability.
 
+### 5.8 Routing: when to use which (harness, model) — local vs cloud
+The scorecard now emits the decision this benchmark exists to serve
+([`SCORECARD.md`](../crucible/results/SCORECARD.md) §3 economics, §4 routing table). Two reads:
+
+- **Economics (§3).** Local marginal cost is $0 but you pay it in *latency*: `ollama@qwen3` finishes
+  a run in ~9s, the deepseek models in 50–150s+. Claude runs **$0.72–$1.70/run** here. So the routing
+  question is never "which is best" — it's *"does a local pair clear my quality bar at acceptable
+  latency, before I pay cloud $?"*
+- **The routing table (§4).** Per tier, the best local `(harness, model)` ties Claude's Goodput on
+  every tier we tested — so the verdict is **✅ stay local**, and the win is cost. But the winning
+  pair is *tier-specific* (`pi@qwen3` for T1 tool-recover, `aider@deepseek-r1:8b` for T2) — a
+  difficulty-router (RouteLLM, Hybrid-LLM) can't pick it from prompt length; it needs this table.
+
+The sharper, more actionable cut is **"your local model is fixed"** (it's whatever fits your GPU):
+
+| Local model | routing verdict |
+|---|---|
+| **qwen3:8b** | clears **every** tier locally — stay local, save $0.72–$1.70/run (pick the right harness per tier) |
+| **deepseek-r1:8b** | clears T0/T2/T3/T4; **escalate T1 tool-recover** (best-local 0.13) to cloud |
+| **deepseek-r1:1.5b** | escalate almost everything (only T2 borderline, 0.70) — too weak to harness around |
+
+The rule that falls out: **the harness choice matters most in the middle.** A mid model (`qwen3:8b`)
+can be *harnessed* to match cloud on every tier if you pick the right harness; a tiny model can't be
+harnessed into capability it lacks (escalate); and **tool-recovery (T1) is the one tier where even a
+solid 8B local model should hand off to cloud.** (These verdicts are pinned in `audit-claims.js`.)
+
 ## 6. Claude *as the model* behind the lean harnesses (a frontier slice)
 
 The v1/v2 batteries run `claude` as a whole *harness* (Claude Code driving its own tools). A natural
