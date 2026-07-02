@@ -28,7 +28,7 @@ const bestLocalGP = (model, tier) => {
   let best = 0;
   for (const a of [...new Set(rows.map(r => r.adapter))]) {
     const rs = rows.filter(r => r.adapter === a && r.model === model && tierOf(r.task) === tier);
-    if (rs.length) best = Math.max(best, rs.reduce((s, r) => s + (r.score ?? 0), 0) / rs.length);
+    if (rs.length) best = Math.max(best, rs.reduce((s, r) => s + (r.timed_out ? 0 : (r.score ?? 0)), 0) / rs.length);
   }
   return best;
 };
@@ -39,8 +39,10 @@ const sel = (a, m, task) => rows.filter(r =>
 const finished = rs => rs.filter(r => !r.timed_out);
 const passes = rs => finished(rs).filter(r => r.result === 'passed').length;
 const timeouts = rs => rs.filter(r => r.timed_out).length;
-// Goodput = mean gated Score over ALL attempts (timeouts are score-0 rows already in the ledger).
-const goodput = rs => rs.length ? rs.reduce((s, r) => s + (r.score ?? 0), 0) / rs.length : 0;
+// Goodput = mean gated Score over ALL attempts. A timeout is a delivery failure worth 0 — enforced
+// here rather than trusted from the row (matches report.js's goodput()), so a stray nonzero score on
+// a timed-out row can't let this guard silently diverge from the scorecard it's meant to protect.
+const goodput = rs => rs.length ? rs.reduce((s, r) => s + (r.timed_out ? 0 : (r.score ?? 0)), 0) / rs.length : 0;
 // Score|fin = mean gated Score over finished runs only (the old, conditional headline).
 const condScore = rs => { const f = finished(rs); return f.length ? f.reduce((s, r) => s + (r.score ?? 0), 0) / f.length : 0; };
 const relPct = rs => rs.length ? 100 * finished(rs).length / rs.length : 0;

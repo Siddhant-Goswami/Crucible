@@ -175,7 +175,7 @@ md.push('| Harness | ' + tiers.map(t => `${t} [n]`).join(' | ') + ' |');
 md.push('|---|' + tiers.map(() => '--:').join('|') + '|');
 for (const a of adapters) {
   const cellsForA = tiers.map(t => {
-    const vec = rows.filter(r => r.adapter === a && tierOf(r.task) === t).map(r => r.score);  // timeouts have score 0 in-ledger
+    const vec = rows.filter(r => r.adapter === a && tierOf(r.task) === t).map(r => r.timed_out ? 0 : (r.score ?? 0));  // timeout = delivery failure = 0
     return vec.length ? `${r2(mean(vec))} [${vec.length}]` : '—';
   });
   md.push(`| ${a} | ${cellsForA.join(' | ')} |`);
@@ -227,8 +227,8 @@ function cellGoodput(adapter, model, tier) {
   if (!rs.length) return null;
   const fin = rs.filter(r => !r.timed_out);
   return {
-    gp: mean(rs.map(r => r.score ?? 0)), rel: rs.length ? fin.length / rs.length : 0,
-    lat: median(fin.map(r => r.wall_ms || 0)), n: rs.length,
+    gp: mean(rs.map(r => r.timed_out ? 0 : (r.score ?? 0))), rel: rs.length ? fin.length / rs.length : 0,
+    lat: fin.length ? median(fin.map(r => r.wall_ms || 0)) : null, n: rs.length,   // null (not 0.0s) when nothing finished
     cost: fin.length ? fin.reduce((s, r) => s + priceRun(r, pricing), 0) / fin.length : null,
   };
 }
@@ -253,7 +253,7 @@ for (const t of tiers) {
   else if (cloud && !best) verdict = `☁️ cloud only — ${cloud.key}`;
   else verdict = `⚠️ hard — best ${best ? best.key + ' @ ' + r2(best.gp) : '—'}`;
   const cloudCost = cloud && cloud.cost != null ? (cloud.cost === 0 ? '$0*' : '$' + cloud.cost.toFixed(2)) : '—';
-  md.push(`| ${TIER_LABEL[t] || t} | ${best ? best.key : '—'} | ${best ? r2(best.gp) + ' [' + best.n + ']' : '—'} | ${best ? pct(best.rel) + '%' : '—'} | ${best ? (best.lat / 1000).toFixed(1) : '—'} | ${cloud ? cloud.key : '—'} | ${cloud ? r2(cloud.gp) : '—'} | ${cloudCost} | ${verdict} |`);
+  md.push(`| ${TIER_LABEL[t] || t} | ${best ? best.key : '—'} | ${best ? r2(best.gp) + ' [' + best.n + ']' : '—'} | ${best ? pct(best.rel) + '%' : '—'} | ${best && best.lat != null ? (best.lat / 1000).toFixed(1) : '—'} | ${cloud ? cloud.key : '—'} | ${cloud ? r2(cloud.gp) : '—'} | ${cloudCost} | ${verdict} |`);
 }
 md.push('');
 md.push('_`[n]` = attempts behind the best-local pick. `$0*` = a cloud model run via a **subscription** (codex@gpt-5.5 on a ChatGPT plan), not a metered API — no per-token charge here, so read it as "subscription", not "free at scale". Where local ties cloud on Goodput the verdict is **✅ local**: the win is cost + latency, since a well-chosen local pair matches cloud quality per tier. The catch a difficulty-router misses: the winning pair is tier-specific — you need this table to pick it, not prompt length._');

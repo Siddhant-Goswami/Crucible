@@ -149,9 +149,9 @@ Averaged across the local panel (mean Goodput), **`aider` leads every non-Claude
 `ollama` follows (0.54); `hermes` (0.30), `pi` (0.23), `goose` (0.11), and `codex` (0.00) each win on
 at most one model and vanish on the rest. The report's rank-stability check fires: **⚠️ the ordering
 changes across models** — most harness advantages are *model-specific, not structural*. And `aider`'s
-edge is **statistically real**: on Goodput it beats `ollama` by Δ=**0.37** [0.155, 0.589] on
-`deepseek-r1:1.5b` and Δ=**0.183** [0.011, 0.362] on `deepseek-r1:8b` (both **significant**, paired
-bootstrap). On `qwen3:8b` the top two are `hermes` vs `ollama` Δ=0.029 [-0.021, 0.11], **not
+edge is **statistically real**: on Goodput it beats `ollama` by Δ=**0.37** [0.158, 0.58] on
+`deepseek-r1:1.5b` and Δ=**0.183** [0.012, 0.368] on `deepseek-r1:8b` (both **significant**, paired
+bootstrap). On `qwen3:8b` the top two are `hermes` vs `ollama` Δ=0.029 [-0.022, 0.112], **not
 significant** — a genuine tie between the two most *reliable* harnesses, not the timeout-inflated
 `pi`/`goose` tie the earlier draft reported.
 
