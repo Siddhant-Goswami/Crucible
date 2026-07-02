@@ -277,6 +277,15 @@ Four findings, each a clean instance of a core principle:
   be pointed at the shim at all.) The same structural fault line as the reasoning-model result:
   *what shape the interface expects* decides whether a harness can use a given model.
 
+  **Update (Tier 1): this gap is now closable — with a real API key.** The timeout was a limitation of
+  the *OAuth* shim, not of the idea. `proxy/anthropic-shim.js` is an OpenAI/Ollama-compatible endpoint
+  backed by the **Anthropic Messages API** (`ANTHROPIC_API_KEY`, not the OAuth login) that **translates
+  tool-calls both ways** — OpenAI `tools`/`tool_calls` ↔ Anthropic `tools`/`tool_use`/`tool_result`. A
+  tool-calling harness pointed at it gets real structured tool-calls back, so `pi`/`hermes`/`goose` can
+  finally be measured on a cloud Claude model (metering flows through the normal proxy unchanged; the
+  translation is unit-tested in `crucible/test/anthropic-shim.test.js`). The battery slice itself is
+  left for a run with a key (see §7); this closes the *mechanism* gap, not yet the data gap.
+
 ## 7. Reproduce
 
 ```bash
@@ -293,10 +302,16 @@ node crucible/report.js crucible/results/battery.jsonl
 # one instrumented run:
 CRUCIBLE=1 HARNESS_MODEL=qwen3:8b SEED=1 ./loop.sh crucible/tasks/tool-recover pi 6
 
-# §6 frontier slice — Claude as the MODEL behind a lean harness (uses the logged-in claude CLI):
+# §6 frontier slice — Claude as the MODEL behind a TEXT harness (uses the logged-in claude CLI, tools off):
 node crucible/proxy/claude-shim.js --portfile /tmp/shim.port &   # bridge: Ollama/OpenAI -> claude -p
 CRUCIBLE=1 HARNESS_MODEL=claude-opus-4-8 OLLAMA_UPSTREAM="http://127.0.0.1:$(cat /tmp/shim.port)" \
   ./loop.sh tasks/hello-sum ollama 4
+
+# §6.4 (Tier 1) — Claude behind a TOOL-CALLING harness, via the Anthropic Messages API (needs a KEY):
+export ANTHROPIC_API_KEY=sk-ant-...                              # a real API key, NOT the OAuth login
+node crucible/proxy/anthropic-shim.js --portfile /tmp/ashim.port &   # bridge: OpenAI/Ollama tools <-> Anthropic
+CRUCIBLE=1 HARNESS_MODEL=claude-opus-4-8 OLLAMA_UPSTREAM="http://127.0.0.1:$(cat /tmp/ashim.port)" \
+  ./loop.sh crucible/tasks/tool-recover pi 6                     # pi/hermes/goose now get real tool-calls
 ```
 
 The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-checked
