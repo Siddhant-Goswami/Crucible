@@ -89,7 +89,7 @@ const server = http.createServer((creq, cres) => {
     path: creq.url,
     headers,
   };
-  const ureq = (isHttps ? https : http).request(opts, ures => {
+  const onUpstream = ures => {
     cres.writeHead(ures.statusCode || 502, ures.headers);
     const chunks = [];
     const meter = /\/(api|v1)\//.test(creq.url || '');   // Ollama-native or OpenAI-compat
@@ -97,11 +97,45 @@ const server = http.createServer((creq, cres) => {
     ures.on('end', () => { cres.end(); if (meter && chunks.length) record(parseTokens(Buffer.concat(chunks))); });
     // a mid-stream upstream reset (Ollama restart/OOM) must not crash the proxy
     ures.on('error', () => { try { cres.end(); } catch {} });
-  });
-  ureq.on('error', e => { if (!cres.headersSent) cres.writeHead(502); try { cres.end('crucible-proxy upstream error: ' + e.message); } catch {} });
+  };
+  const onUerr = e => { if (!cres.headersSent) cres.writeHead(502); try { cres.end('crucible-proxy upstream error: ' + e.message); } catch {} };
   // client disconnects / socket errors are non-fatal to the proxy
   creq.on('error', () => {});
   cres.on('error', () => {});
+
+  // Think-mode pinning (CRZ_THINK=true|false): the EFFECTIVE reasoning mode of a served model is
+  // whatever the serving default is, which silently varies by model/template — a battery cell is
+  // only attributable if the mode is pinned per run. When set, buffer generation-request bodies
+  // and inject `think` uniformly for every harness; unset = passthrough (byte-identical behavior).
+  const THINK = process.env.CRZ_THINK || '';
+  const genPath = /\/api\/(chat|generate)|\/v1\/(chat\/completions|completions|responses)/.test(creq.url || '');
+  if ((THINK === 'true' || THINK === 'false') && creq.method === 'POST' && genPath) {
+    const bufs = [];
+    creq.on('data', d => bufs.push(d));
+    creq.on('end', () => {
+      let body = Buffer.concat(bufs);
+      try {
+        const o = JSON.parse(body.toString('utf8'));
+        if (/^\/v1\//.test(creq.url || '')) {
+          // Ollama's OpenAI-compat endpoints ignore `think`; they honor reasoning_effort
+          // ("none" verified to suppress reasoning on qwen3.5, 2026-07-02).
+          o.reasoning_effort = THINK === 'true' ? 'high' : 'none';
+        } else {
+          o.think = THINK === 'true';
+        }
+        body = Buffer.from(JSON.stringify(o));
+      } catch {}   // non-JSON body: forward untouched
+      const h = { ...opts.headers, 'content-length': Buffer.byteLength(body) };
+      delete h['transfer-encoding'];
+      const u = (isHttps ? https : http).request({ ...opts, headers: h }, onUpstream);
+      u.on('error', onUerr);
+      u.end(body);
+    });
+    return;
+  }
+
+  const ureq = (isHttps ? https : http).request(opts, onUpstream);
+  ureq.on('error', onUerr);
   creq.pipe(ureq);
 });
 

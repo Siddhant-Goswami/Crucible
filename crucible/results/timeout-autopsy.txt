@@ -1,0 +1,77 @@
+cell                                          wt   calls idle_tail inflight verdict
+api-migration.aider.qwen3_8b.s1               600  4     279       true     CUT_OFF_WITHIN_BUDGET
+api-migration.aider.qwen3_8b.s2               600  2     499       true     CUT_OFF_WITHIN_BUDGET
+api-migration.goose.qwen3_8b.s1               600  10    8         true     CUT_OFF_WITHIN_BUDGET
+api-migration.goose.qwen3_8b.s2               600  9     27        true     CUT_OFF_WITHIN_BUDGET
+api-migration.goose.qwen3_8b.s3               600  8     47        true     CUT_OFF_WITHIN_BUDGET
+api-migration.pi.qwen3_8b.s1                  600  12    20        true     CUT_OFF_WITHIN_BUDGET
+api-migration.pi.qwen3_8b.s2                  600  12    34        true     CUT_OFF_WITHIN_BUDGET
+api-migration.pi.qwen3_8b.s3                  600  15    45        true     CUT_OFF_WITHIN_BUDGET
+fizzbuzz.goose.qwen3_8b.s1                    300  5     47        true     CUT_OFF_WITHIN_BUDGET
+fizzbuzz.goose.qwen3_8b.s2                    300  6     5         true     CUT_OFF_WITHIN_BUDGET
+fizzbuzz.goose.qwen3_8b.s3                    300  6     0         true     CUT_OFF_WITHIN_BUDGET
+fizzbuzz.pi.qwen3_8b.s1                       300  7     36        true     CUT_OFF_WITHIN_BUDGET
+fizzbuzz.pi.qwen3_8b.s2                       300  7     2         true     CUT_OFF_WITHIN_BUDGET
+fizzbuzz.pi.qwen3_8b.s3                       300  8     17        true     CUT_OFF_WITHIN_BUDGET
+hello-sum.goose.qwen3_8b.s2                   300  2     216       true     CUT_OFF_WITHIN_BUDGET
+research-deck.aider.deepseek_r1_1_5b.s3       600  10    190       true     CUT_OFF_WITHIN_BUDGET
+research-deck.goose.qwen3_8b.s1               600  17    99        true     CUT_OFF_WITHIN_BUDGET
+research-deck.goose.qwen3_8b.s2               600  16    22        true     CUT_OFF_WITHIN_BUDGET
+research-deck.goose.qwen3_8b.s3               600  11    53        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.aider.deepseek_r1_1_5b.s3      300  5     58        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.aider.deepseek_r1_8b.s1        300  0     300       true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.aider.deepseek_r1_8b.s3        300  5     30        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.codex.qwen3_8b.s1              300  0     56        false    HUNG_NEVER_CALLED
+roman-numerals.codex.qwen3_8b.s2              300  0     84        false    HUNG_NEVER_CALLED
+roman-numerals.codex.qwen3_8b.s3              300  0     42        false    HUNG_NEVER_CALLED
+roman-numerals.goose.deepseek_r1_1_5b.s1      300  7     82        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.deepseek_r1_1_5b.s2      300  5     170       true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.deepseek_r1_1_5b.s3      300  7     29        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.deepseek_r1_8b.s1        300  1     136       true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.deepseek_r1_8b.s2        300  5     125       true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.deepseek_r1_8b.s3        300  7     18        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.qwen3_8b.s1              300  4     28        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.qwen3_8b.s2              300  4     35        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.goose.qwen3_8b.s3              300  5     13        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.ollama.deepseek_r1_8b.s2       300  3     0         true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.ollama.deepseek_r1_8b.s3       300  2     62        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.pi.deepseek_r1_1_5b.s2         300  3     20        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.pi.deepseek_r1_1_5b.s3         300  2     52        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.pi.deepseek_r1_8b.s1           300  1     246       true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.pi.deepseek_r1_8b.s2           300  1     33        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.pi.deepseek_r1_8b.s3           300  3     69        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.pi.qwen3_8b.s1                 300  4     52        true     CUT_OFF_WITHIN_BUDGET
+roman-numerals.pi.qwen3_8b.s2                 300  5     23        true     CUT_OFF_WITHIN_BUDGET
+secret-redaction.aider.deepseek_r1_1_5b.s2    300  3     0         true     CUT_OFF_WITHIN_BUDGET
+secret-redaction.goose.qwen3_8b.s1            300  6     6         true     CUT_OFF_WITHIN_BUDGET
+self-improving-rubric.aider.deepseek_r1_1_5b.s2500  5     308       true     CUT_OFF_WITHIN_BUDGET
+self-improving-rubric.goose.qwen3_8b.s2       500  12    58        true     CUT_OFF_WITHIN_BUDGET
+temp-convert.codex.qwen3_8b.s1                400  0     43        false    HUNG_NEVER_CALLED
+temp-convert.goose.qwen3_8b.s3                400  8     35        true     CUT_OFF_WITHIN_BUDGET
+tool-recover.aider.qwen3_8b.s1                600  1     538       true     CUT_OFF_WITHIN_BUDGET
+tool-recover.aider.qwen3_8b.s2                600  2     489       true     CUT_OFF_WITHIN_BUDGET
+tool-recover.aider.qwen3_8b.s3                600  5     204       true     CUT_OFF_WITHIN_BUDGET
+tool-recover.goose.qwen3_8b.s2                600  13    35        true     CUT_OFF_WITHIN_BUDGET
+tool-recover.goose.qwen3_8b.s3                600  13    32        true     CUT_OFF_WITHIN_BUDGET
+tool-recover.ollama.qwen3_8b.s1               600  2     197       true     CUT_OFF_WITHIN_BUDGET
+
+== summary by (adapter, model) ==
+aider @ deepseek-r1:1.5b        CUT_OFF_WITHIN_BUDGET:4
+aider @ deepseek-r1:8b          CUT_OFF_WITHIN_BUDGET:2
+aider @ qwen3:8b                CUT_OFF_WITHIN_BUDGET:5
+codex @ qwen3:8b                HUNG_NEVER_CALLED:4
+goose @ deepseek-r1:1.5b        CUT_OFF_WITHIN_BUDGET:3
+goose @ deepseek-r1:8b          CUT_OFF_WITHIN_BUDGET:3
+goose @ qwen3:8b                CUT_OFF_WITHIN_BUDGET:18
+ollama @ deepseek-r1:8b         CUT_OFF_WITHIN_BUDGET:2
+ollama @ qwen3:8b               CUT_OFF_WITHIN_BUDGET:1
+pi @ deepseek-r1:1.5b           CUT_OFF_WITHIN_BUDGET:2
+pi @ deepseek-r1:8b             CUT_OFF_WITHIN_BUDGET:3
+pi @ qwen3:8b                   CUT_OFF_WITHIN_BUDGET:8
+
+== overall ==
+CUT_OFF_WITHIN_BUDGET   51  (93%)
+HUNG_NEVER_CALLED       4  (7%)
+
+H4 read: 4 hangs (harness failure on any host) · 0 cut off already over token budget (harness overconsumption, host-independent) · 51 cut off within token budget (wall-clock/latency, HOST-CONDITIONAL). 
+Goodput remains the right delivery metric, but "reliability is a harness property" must be re-attributed: only the first two classes travel across hardware.

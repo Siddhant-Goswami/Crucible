@@ -370,6 +370,12 @@ md.push('');
 
 const out = md.join('\n') + '\n';
 fs.mkdirSync(path.join(__dirname, 'results'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, 'results', 'SCORECARD.md'), out);
+// A custom ledger writes SCORECARD-<ledger-stem>.md so a side-battery (e.g. a qwen3.5 arm) can
+// never clobber the published SCORECARD.md that audit-claims.js guards. Only the canonical
+// battery ledgers regenerate the main scorecard.
+const stem = path.basename(LEDGER).replace(/\.jsonl$/, '');
+const scorecard = (stem === 'battery' || stem === 'battery.published')
+  ? 'SCORECARD.md' : `SCORECARD-${stem}.md`;
+fs.writeFileSync(path.join(__dirname, 'results', scorecard), out);
 process.stdout.write(out);
-console.error('\nwrote crucible/results/SCORECARD.md');
+console.error('\nwrote crucible/results/' + scorecard);

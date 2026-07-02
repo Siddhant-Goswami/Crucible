@@ -124,10 +124,16 @@ Status ∈ {**pilot-supported (in-sample)**, **preliminary**, **to pre-register 
     same rich harnesses recover.
   - **Refuted if.** The collapse tracks model size/capability rather than output shape (e.g., the 8B
     reasoning model behaves like the 8B clean model).
-  - **Status. Pilot-supported (in-sample).** `pi`/`goose`/`hermes` → 0 on both deepseek models,
-    ~0.7–0.9 on qwen3; `aider`/`ollama` survive both. *At-risk regression:* "output shape" and "model
-    family" are confounded here (both reasoning models are deepseek-r1) — §5 must add a *clean* model
-    of similar size and a *reasoning* model of a different family to de-confound.
+  - **Status. Pilot-supported (in-sample) — narrowed and re-mechanized (§5A.2).** `pi`/`goose` → 0
+    on both deepseek models, ~0.7–0.9 on qwen3; `aider`/`ollama` survive both. **`hermes` is
+    dropped from H3b's evidence**: its deepseek zeros are an upstream transport failure (0 metered
+    tokens, no model output to parse — results §5.2), not a shape effect. *At-risk regression:*
+    "output shape" and "model family" are confounded here (both reasoning models are deepseek-r1);
+    moreover live probes (2026-07-02) show the operative variable is **where the serving stack puts
+    reasoning**: current Ollama serves `qwen3:8b` and `qwen3.5:9b` with thinking in a *separate
+    field* (content channel clean in both think modes), while the pinned `deepseek-r1` templates
+    leave `<think>` inline in content. H3b's mechanism is therefore *inline-in-content reasoning*,
+    a (model template × serving layer) property — de-confounding design in §5A.2.
 
 ### H4 — Reliability is first-class: excluding timeouts inverts rankings (RQ1, methods)
 - **Claim.** Scoring only finished runs (dropping timeouts) biases scores upward for flaky harnesses
@@ -139,9 +145,14 @@ Status ∈ {**pilot-supported (in-sample)**, **preliminary**, **to pre-register 
 - **Risky prediction.** At least one harness that leads on finished-only Score is *not* the leader on
   Goodput, and the gap is ≥0.2.
 - **Refuted if.** Goodput and finished-only rankings coincide everywhere (timeouts negligible/uniform).
-- **Status. Pilot-supported (in-sample).** `qwen3:8b`: `pi` 1.00→**0.70** (70% finish), `goose`
-  0.99→**0.33** (33%); the finished-only leader (`pi`/`goose`) is displaced by the reliable
-  `hermes`/`ollama` under Goodput. Deterministic, drift-guarded (`audit-claims.js`).
+- **Status. Pilot-supported (in-sample) — but re-attributed by the timeout autopsy (§5A.1).**
+  `qwen3:8b`: `pi` 1.00→**0.70** (70% finish), `goose` 0.99→**0.33** (33%); the finished-only
+  leader (`pi`/`goose`) is displaced by the reliable `hermes`/`ollama` under Goodput.
+  Deterministic, drift-guarded (`audit-claims.js`). *Correction:* per-cell autopsy
+  (`crucible/results/TIMEOUT-AUTOPSY.md`) shows 51/55 timeouts were **cut off while working,
+  within token budget** (host-conditional wall-clock latency), not harness hangs (4/55, all
+  `codex`). The ranking inversion and "count timeouts as 0" stand (delivery is delivery), but
+  the *mechanism* clause "flaky harnesses hang" is withdrawn; see §5A.1 for the reframed claim.
 
 ### H5 — The local-vs-cloud routing decision is governed by task-capability tier, not prompt difficulty (RQ4)
 - **Claim.** Whether a task can be done locally is governed by (task tier × model capability); one
@@ -230,6 +241,70 @@ within-interface-class model-capability effect on sub-frontier models.* If, on t
 capability explains the outcomes and interface-fit does not, the central thesis is refuted — report it.
 
 ---
+
+## 5A. Amendment 1 — pre-battery design updates (2026-07-02, before the scaled run)
+
+> Dated amendment, logged **before** any confirmatory cell of the scaled battery was run.
+> Motivated by (a) the timeout autopsy on the frozen pilot ledger and (b) live probes of the
+> qwen3.5 release. Nothing below was informed by scaled-battery outcomes.
+
+### 5A.1 H4 reframed: delivery-within-budget, with attribution split
+The autopsy (`crucible/results/TIMEOUT-AUTOPSY.md`, tool `crucible/tools/classify-timeouts.js`)
+classified all 55 pilot timeouts with three independent evidence sources (workdir mtimes, proxy
+events, Ollama server-log request windows): **51 cut-off-while-working within token budget**
+(host-conditional latency), **4 hung-never-called-model** (`codex@qwen3:8b` — harness transport
+failure), 0 mid-run hangs, 0 token-overbudget. Accordingly:
+- **Kept:** Goodput (timeouts = 0) as the headline delivery metric; the finished-only inversion.
+- **Withdrawn:** the mechanism clause "flaky harnesses hang"; the central thesis's word
+  *reliability* is re-scoped to *delivery within budget*.
+- **New attribution split (pre-registered):** every timeout in the scaled battery is autopsied
+  into {hang, token-overbudget, wall-clock-within-budget}; only the first two are claimed as
+  harness properties. The harness-attributable driver of wall-clock exhaustion is *loop shape*
+  (round trips per cell, tokens per iteration) and is reported per harness.
+- **Budgets:** `wall_timeout_s` is re-fit per (model, host) as k× that model's median finished-run
+  wall time on the T0 floor (k frozen before the battery; k=5 unless amended), keeping the token
+  budget as the host-independent primary cap. Wall-clock Goodput is labeled host-conditional.
+
+### 5A.2 H3b re-mechanized: inline-vs-out-of-band reasoning, de-confounded on qwen3.5
+Live probes: `qwen3.5:9b` (and `qwen3:8b` on the same stack) return reasoning in a **separate
+field** on both the native and `/v1` endpoints — the content channel stays clean in both think
+modes; the pinned `deepseek-r1` templates emit `<think>` inline in content. New design:
+1. **Same-weights thinking toggle** (`qwen3.5:9b` think on/off; also 2b/4b): isolates thinking
+   *overhead* (latency/tokens) from capability at fixed weights. Prediction: parse-and-apply
+   harnesses (`pi`/`goose`) do **not** collapse in either mode (content stays clean); wall-clock
+   cost rises with think on.
+2. **Inline-narration arm**: the pinned `deepseek-r1` digests (NOT re-pulled — the frozen ledger
+   depends on them) remain the inline-reasoning probes. Optionally, a re-pull of the same weights
+   under a fresh tag (new template with separated thinking) gives a **same-weights serving-layer
+   contrast**: inline vs out-of-band on identical weights — the cleanest possible H3b test; both
+   digests pinned in `ENV.md`.
+3. `hermes` is excluded from H3b evidence (transport artifact, §3 H3b status); its deepseek cells
+   are re-run only after the context-window/`/v1` redirect fault is fixed and are reported under H1.
+
+### 5A.3 H3a gains a local bookend: codex @ qwen3.5:9b
+`qwen3.5:9b` emits well-formed OpenAI-style structured tool calls (probe 2026-07-02). Pre-registered
+prediction: `codex` — 0/77 on all prior local models — scores **>0 on `qwen3.5:9b`**, reproducing
+the interface-fit discontinuity *entirely locally* (no cloud/scale/home-turf confound). Refuted if
+codex stays ~0 there while `pi`/`hermes`/`goose` (same protocol class) recover — that would mean
+codex's zero is not (only) protocol availability. Either outcome is reported. The cloud bookend
+(gpt-5.5) is retained but relabeled "native-provider demonstration" (co-tuning confound noted).
+
+### 5A.4 Statistics tightened (applies to every §5.4 comparison)
+- All paired comparisons use a **task-clustered bootstrap** (resample tasks, then seeds within
+  task); per-run pooling is reported only as a sensitivity check.
+- H2's rank-stability claim requires a **noise null**: observed cross-model rank instability
+  (Kendall's τ between model columns) must exceed the 95th percentile of a null built by
+  seed-resampling within model columns; "the ordering changes" alone is not evidence.
+- H1's spread is computed **among interface-compatible pairs** (protocol-handshake passes);
+  structural zeros of the H3a class are excluded from H1 so one phenomenon is not counted twice.
+
+### 5A.5 Model panel (supersedes §5.1's local list)
+Spine: **qwen3.5 ladder** `2b`/`4b`/`9b`, each ± thinking (same weights) — within-family,
+within-generation size sweep on 16GB hardware. Anchors: `qwen3:8b` (cross-generation link to the
+frozen pilot), pinned `deepseek-r1:1.5b`/`8b` (inline-narration arm; Llama- and Qwen-distill
+respectively, giving within-family shape contrasts). Cloud: unchanged (§5.1 clause on ≥2 families).
+`qwen3:14b` is dropped (marginal on 16GB; superseded by the 9B new-generation point — the axis it
+served is relabeled capability-per-GB, not size).
 
 ## 6. Threats to validity (carried from the datasheet)
 
