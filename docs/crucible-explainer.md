@@ -109,6 +109,7 @@ don't mistake luck for skill.
 | `tasks/*` and `crucible/tasks/*` | the problems harnesses are tested on (each is a folder with a goal + a checker) |
 | `crucible/bench.sh` | runs the whole benchmark and prints the scorecard |
 | `crucible/report.js` | turns raw results into the readable scorecard |
+| `crucible/proxy/claude-shim.js` | bridges a lean harness to **Claude as the model** — exposes the signed-in Claude session as an Ollama/OpenAI endpoint (see §10) |
 | `crucible/SPEC.md` | the precise, portable rules of the benchmark |
 | `docs/crucible-results.md` | the results + methodology writeup |
 | `docs/harness-first-principles.md` | the deep "why," from first principles |
@@ -239,7 +240,42 @@ the bill next to the grade, so a slow or pricey "win" can't masquerade as a chea
 
 ---
 
-## 10. Want to test your own harness or task?
+## 10. What if you put a *frontier* model behind these lean harnesses?
+
+So far the lean harnesses ran on small local models. What happens if we feed them the **best** model
+instead? We wired **Claude** (using the signed-in Claude session as the "engine") in behind the lean
+harnesses and re-ran the benchmark. Three things fell out — and each one is the benchmark teaching a
+lesson, not just posting a score.
+
+**1. With a great model, the harnesses stop looking different — on quality.** Both text-based
+harnesses (`ollama`, `aider`) now *passed everything*, scoring ~0.97–0.98. When the engine is that
+strong, the scaffolding around it barely changes whether the task gets done. (Remember lesson #3
+from §9: a strong model flattens differences. Here it flattens them almost completely.)
+
+**2. …so the difference moves to the *bill*.** Quality tied — but cost didn't, and the gap was huge:
+one harness (`aider`) cost about **6× more** per run and was **~9× less efficient** with tokens than
+the other (`ollama`), because it churned through many more back-and-forths with the model. This is
+the single most important habit Crucible tries to build: **when two things are equally good, look at
+what they cost.** A "win" that costs 6× as much is not the same win.
+
+**3. A strong model can quietly *cheat* a task designed to force tool use.** One task deliberately
+requires running a little generator program to produce a 200-row data file, and even says "don't
+write it by hand." A weak model can't fake that. Claude just… **wrote all 200 rows by hand** and
+passed — the automatic checker only runs the final test, so it couldn't tell. Only one of the
+sub-scores (State) noticed something was off. The takeaway is for *task designers*: if you want to
+force tool use, the answer has to be something the model genuinely can't produce from memory.
+
+**One honest limitation:** we could only do this for the "text-based" harnesses (`ollama`, `aider`).
+The tool-using harnesses (`pi`, `goose`, and friends) expect the model to speak a special
+"call-this-tool" language, and our simple Claude bridge only hands back plain text — so those
+harnesses just sat waiting and timed out. (Making them work would need a deeper adapter, and an API
+key rather than a normal login.) That's the same lesson as everywhere else in Crucible: **whether a
+harness can use a model depends on whether they speak the same interface** — not just on how smart
+the model is.
+
+---
+
+## 11. Want to test your own harness or task?
 
 It's deliberately simple:
 
@@ -252,7 +288,7 @@ It's deliberately simple:
 
 ---
 
-## 11. Mini-glossary
+## 12. Mini-glossary
 
 - **Model** — the raw AI (e.g. `qwen3:8b`, Claude). Produces text; forgets between calls.
 - **Harness** — the scaffolding that turns a model into an agent (tools, loop, memory, safety).
@@ -265,7 +301,7 @@ It's deliberately simple:
 
 ---
 
-## 12. Go deeper
+## 13. Go deeper
 
 - [`crucible/README.md`](../crucible/README.md) — the technical overview.
 - [`crucible/SPEC.md`](../crucible/SPEC.md) — the exact, portable benchmark rules.
