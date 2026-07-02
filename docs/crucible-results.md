@@ -99,8 +99,9 @@ error) and passes.
 
 ### 5.2 The output *shape* reorders the field — and "Score 0" hides ≥3 different reasons (P2, P8)
 Read across the two reasoning models (`deepseek-r1:*`) against the clean-output one (`qwen3:8b`) and
-a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses — `pi`, `hermes`,
-`goose`, `codex` — collapse to **0**, yet on `qwen3:8b` those same harnesses jump to ~0.9–1.0. The
+a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses `pi`, `hermes`, and
+`goose` collapse to **0**, yet on `qwen3:8b` they recover to ~0.9–1.0 — whereas `codex` is a
+structural zero on *every* local model (`qwen3:8b` included; see §5.4), so it never recovers. The
 only harnesses that survive the deepseek models are **`aider`** (0.58 / 0.88) and the thin **`ollama`**
 control (0.12 / 0.68).
 
