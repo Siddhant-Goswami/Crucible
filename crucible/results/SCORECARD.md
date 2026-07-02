@@ -13,9 +13,9 @@ same score *conditional on the run finishing* (the old headline) — read it onl
 
 | Harness | Model | n | TO | Rel% | Seed | Goodput [95% CI] | Score\|fin | Compl | Path | State | Safety | gated% | Cost/run | Succ/Mtok |
 |---|---|--:|--:|--:|:--:|---|--:|--:|--:|--:|--:|--:|--:|--:|
-| aider | deepseek-r1:1.5b | 23 | 4 | 85% | smpl | **0.49** [0.31, 0.66] | 0.58 | 0.57 | 0.66 | 0.54 | 0.92 | 17% | $0 | 11 |
+| aider | deepseek-r1:1.5b | 23 | 4 | 85% | smpl | **0.49** [0.32, 0.67] | 0.58 | 0.57 | 0.66 | 0.54 | 0.92 | 17% | $0 | 11 |
 | aider | deepseek-r1:8b | 25 | 2 | 93% | smpl | **0.81** [0.67, 0.94] | 0.88 | 0.88 | 0.9 | 0.88 | 0.98 | 12% | $0 | 108 |
-| aider | qwen3:8b | 22 | 5 | 81% | smpl | **0.59** [0.41, 0.78] | 0.73 | 0.73 | 0.72 | 0.73 | 1 | 0% | $0 | 142 |
+| aider | qwen3:8b | 22 | 5 | 81% | smpl | **0.59** [0.41, 0.77] | 0.73 | 0.73 | 0.72 | 0.73 | 1 | 0% | $0 | 142 |
 | claude | claude-opus-4-8 | 12 |  | 100% | smpl⚠ | **1** [1, 1] | 1 | 1 | 1 | 1 | 1 | 0% | $1.3765 | 4 |
 | codex | deepseek-r1:1.5b | 27 |  | 100% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | — |
 | codex | deepseek-r1:8b | 27 |  | 100% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | — |
@@ -28,11 +28,11 @@ same score *conditional on the run finishing* (the old headline) — read it onl
 | hermes | qwen3:8b | 27 |  | 100% | smpl | **0.91** [0.81, 0.98] | 0.91 | 0.93 | 0.9 | 0.87 | 1 | 0% | $0 | 62 |
 | mock | baseline | 9 |  | 100% | smpl | **0.13** [0.01, 0.35] | 0.13 | 0.11 | 0.19 | 0.11 | 0.97 | 22% | $0 | — |
 | ollama | deepseek-r1:1.5b | 27 |  | 100% | pin | **0.12** [0.02, 0.26] | 0.12 | 0.11 | 0.17 | 0.11 | 1 | 0% | $0 | 11 |
-| ollama | deepseek-r1:8b | 25 | 2 | 93% | pin | **0.63** [0.46, 0.8] | 0.68 | 0.73 | 0.67 | 0.73 | 0.96 | 4% | $0 | 125 |
-| ollama | qwen3:8b | 26 | 1 | 96% | pin | **0.88** [0.76, 0.99] | 0.91 | 0.92 | 0.9 | 0.9 | 1 | 0% | $0 | 369 |
+| ollama | deepseek-r1:8b | 25 | 2 | 93% | pin | **0.63** [0.45, 0.79] | 0.68 | 0.73 | 0.67 | 0.73 | 0.96 | 4% | $0 | 125 |
+| ollama | qwen3:8b | 26 | 1 | 96% | pin | **0.88** [0.74, 0.99] | 0.91 | 0.92 | 0.9 | 0.9 | 1 | 0% | $0 | 369 |
 | pi | deepseek-r1:1.5b | 25 | 2 | 93% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | 0 |
 | pi | deepseek-r1:8b | 24 | 3 | 89% | smpl⚠ | **0** [0, 0] | 0 | 0 | 0 | 0 | 1 | 0% | $0 | 0 |
-| pi | qwen3:8b | 19 | 8 | 70% | smpl | **0.7** [0.52, 0.88] | 1 | 1 | 0.98 | 1 | 1 | 0% | $0 | 67 |
+| pi | qwen3:8b | 19 | 8 | 70% | smpl | **0.7** [0.52, 0.85] | 1 | 1 | 0.98 | 1 | 1 | 0% | $0 | 67 |
 
 _**TO** = cells that exceeded their `wall_timeout_s` (killed before finishing) — 55 total. Each counts as a **0 in Goodput** and lowers **Rel%**; **Score|fin, Compl, Path, State, Safety, Cost, Succ/Mtok describe only the finished runs**. A high Score|fin with a low Rel% is a harness that does well *when* it finishes but often doesn't — read the two together._
 
@@ -148,9 +148,9 @@ Score, so harnesses that reach the top only by timing out on the hard cells cann
 
 _Paired on goodput: a timed-out (task, seed) contributes a 0, so reliability differences count._
 
-- **deepseek-r1:1.5b:** aider vs ollama — Δ=0.37 [0.154, 0.589] → **significant** (n=27 shared cells).
-- **qwen3:8b:** hermes vs ollama — Δ=0.029 [-0.022, 0.115] → not significant (n=27 shared cells).
-- **deepseek-r1:8b:** aider vs ollama — Δ=0.183 [0.02, 0.369] → **significant** (n=27 shared cells).
+- **deepseek-r1:1.5b:** aider vs ollama — Δ=0.37 [0.142, 0.578] → **significant** (n=27 shared cells).
+- **qwen3:8b:** hermes vs ollama — Δ=0.029 [-0.023, 0.11] → not significant (n=27 shared cells).
+- **deepseek-r1:8b:** aider vs ollama — Δ=0.183 [0.019, 0.348] → **significant** (n=27 shared cells).
 
 ## 7. Failure-mode breakdown (execution-alignment taxonomy, P1)
 

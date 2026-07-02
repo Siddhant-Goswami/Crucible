@@ -36,6 +36,15 @@ const r2 = x => Math.round(x * 100) / 100;
 const r3 = x => Math.round(x * 1000) / 1000;
 const pct = x => Math.round(x * 100);
 
+// Seeded PRNG so the bootstrap CIs — and therefore SCORECARD.md — are DETERMINISTIC: the same
+// ledger renders byte-identical output every run, which is what lets CI diff the committed
+// scorecard against a fresh regen. (One shared stream; the call order is fixed, so the sequence is.)
+function mulberry32(a) {
+  return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const RNG = mulberry32(0xC0FFEE);
+const BOOT = 2000;
+
 // tier lookup: read each task's tier from its task.yaml (tasks/ or crucible/tasks/), cached.
 const TASK_DIRS = ['tasks', 'crucible/tasks'];
 const tierCache = {};
@@ -68,7 +77,7 @@ const models = [...new Set(rows.map(r => r.model))].filter(m => m !== 'baseline'
 function agg(runs) {
   const f = k => runs.map(r => r[k] ?? 0);
   const scores = f('score');
-  const ci = bootCI(scores);
+  const ci = bootCI(scores, BOOT, RNG);
   const succ = runs.filter(r => r.result === 'passed');
   const tok = runs.reduce((s, r) => s + (r.tokens_in || 0) + (r.tokens_out || 0), 0);
   const cost = runs.reduce((s, r) => s + priceRun(r, pricing), 0);
@@ -95,7 +104,7 @@ function agg(runs) {
 // Goodput = mean gated Score over ALL attempts (timeouts = 0). Reliability = finish-rate.
 function goodput(c) {
   const vec = c.runs.map(r => r.score).concat(Array(c.timeouts).fill(0));
-  const ci = bootCI(vec);
+  const ci = bootCI(vec, BOOT, RNG);
   const nAll = c.runs.length + c.timeouts;
   return { gp: mean(vec), gpLo: ci[0], gpHi: ci[1], nAll, rel: nAll ? c.runs.length / nAll : 0 };
 }
@@ -302,7 +311,7 @@ for (const m of models) {
   if (ranked.length < 2) continue;
   comparisons++;
   const [A, B] = ranked;
-  const pb = pairedBoot(scoreByKey[A + ' @ ' + m] || {}, scoreByKey[B + ' @ ' + m] || {});
+  const pb = pairedBoot(scoreByKey[A + ' @ ' + m] || {}, scoreByKey[B + ' @ ' + m] || {}, BOOT, RNG);
   const ciStr = Number.isNaN(pb.lo) ? '(need ≥2 shared seeds)' : `Δ=${r3(pb.diff)} [${r3(pb.lo)}, ${r3(pb.hi)}]`;
   md.push(`- **${m}:** ${A} vs ${B} — ${ciStr} → ${pb.sig ? '**significant**' : 'not significant'} (n=${pb.n} shared cells).`);
 }
