@@ -43,3 +43,6 @@ jobs:
           node crucible/report.js crucible/results/battery.published.jsonl >/dev/null
           git diff --exit-code crucible/results/SCORECARD.md \
             || (echo "::error::SCORECARD.md is stale — regenerate: node crucible/report.js crucible/results/battery.published.jsonl" && exit 1)
+
+      - name: External-task importer round-trips (contract wraps external suites)
+        run: node crucible/tools/import-task.js --selftest
