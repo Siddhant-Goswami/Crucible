@@ -97,16 +97,37 @@ error) and passes.
 | codex | 0.00 | 0.00 *(4 TO)* | 0.00 | — |
 | mock (floor) | 0.13, **Safety 0.97 (22% gated)** | — | — | — |
 
-### 5.2 The output *shape* reorders the field as much as model strength (P2, P8)
+### 5.2 The output *shape* reorders the field — and "Score 0" hides ≥3 different reasons (P2, P8)
 Read across the two reasoning models (`deepseek-r1:*`) against the clean-output one (`qwen3:8b`) and
-a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses — `pi`, `hermes`,
-`goose`, `codex` — collapse to **0**, yet on `qwen3:8b` those same harnesses jump to ~0.9–1.0. The
+a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses `pi`, `hermes`, and
+`goose` collapse to **0**, yet on `qwen3:8b` they recover to ~0.9–1.0 — whereas `codex` is a
+structural zero on *every* local model (`qwen3:8b` included; see §5.4), so it never recovers. The
 only harnesses that survive the deepseek models are **`aider`** (0.58 / 0.88) and the thin **`ollama`**
-control (0.12 / 0.68). The most economical explanation: deepseek-r1 emits `<think>` reasoning traces,
-and a harness with a brittle tool-call/file-block parser chokes on them, while `aider`'s and
-`ollama`'s tolerant parsers extract the edit anyway. So it isn't only *how strong* the model is — it's
-*what shape its output takes*, interacting with the harness's parser. Exactly why a score must name a
-`(harness, model)` pair, never a harness alone.
+control (0.12 / 0.68).
+
+We read the per-run traces instead of guessing at one cause — and the shared `0` is **not one
+failure, it is at least three distinct ones**, which is the more honest (and more useful) finding:
+
+- **`pi` and `goose` — the model answers, the harness can't commit it.** The metering proxy logged a
+  full model response on *every* iteration (`pi` ~5.3k output tokens over 6 iters; `goose` ~144k
+  across its `deepseek-r1:8b` cells), yet no file was ever written (`files_written: []`, empty command
+  log) — so every cell is an `artifact_commitment` failure. `deepseek-r1`'s reply is dominated by
+  `<think>…</think>` reasoning narration (a live probe: over half of a short reply is reasoning
+  before any answer), so the harness's parse-and-apply step never extracts an actionable edit. The
+  model talked; the harness couldn't act on it.
+- **`hermes` — no successful call at all.** Zero proxy events and **0 tokens on every deepseek cell**
+  (both `1.5b` and `8b`): hermes never completed a single metered model call. That is an *upstream*
+  transport/config failure (hermes needs a ≥64K context window via an OpenAI-`/v1` redirect, and the
+  request errors before anything is logged) — **not** a parser choking on output, because there is no
+  output to choke on. The opposite mechanism from `pi`/`goose`.
+- **`codex` — a protocol mismatch** (detailed in §5.4): it requires the model to speak its structured
+  tool-call format, the local models can't, and it commits nothing.
+
+So the headline holds — *what shape the model's output takes* reorders the field as much as how
+strong the model is — but the reason a harness lands at `0` is **harness-specific**, and only
+visible in the traces. `aider`'s and `ollama`'s tolerant parsers ride out the reasoning narration and
+commit the edit anyway. Exactly why a score must name a `(harness, model)` pair, never a harness
+alone — and why a bare "Score 0" is a prompt to open the trace, not a conclusion.
 
 ### 5.3 `aider` has reach; the rest are model-specific (P4)
 Averaged across the local panel, **`aider` leads every non-Claude harness on transfer (mean 0.73)** —
@@ -136,10 +157,15 @@ the multiplicative gate surfaces it rather than letting completion paper over it
 
 ### 5.6 How harnesses fail, and what they cost (P1, P7)
 The dominant failure mode is **`artifact_commitment`** — no usable output — and it dwarfs the rest:
-`codex` 77, `hermes` 54, `pi` 49, `goose` 48, `ollama` 16, `aider` 6. `aider` and `ollama` are the
-only harnesses whose failures spread across the taxonomy (contract-format, tool-recovery, state)
-instead of piling entirely into "produced nothing" — the signature of a harness that *engages* the
-task rather than bouncing off it. **Claude failed nothing (12/12).** Cost/latency is first-class:
+`codex` 77, `hermes` 54, `pi` 49, `goose` 48, `ollama` 16, `aider` 6. One caveat the taxonomy alone
+hides (and §5.2 unpacks): `artifact_commitment` is an *outcome* label — "no file committed" — that
+**lumps together at least two root causes**. `pi`/`goose` reach it with the model *answering* but
+the harness unable to apply the reply; `hermes`/`codex` reach it having never obtained a usable model
+response at all. Same bucket, opposite mechanisms — the trace, not the label, tells them apart.
+`aider` and `ollama` are the only harnesses whose failures spread across the taxonomy (contract-format,
+tool-recovery, state) instead of piling entirely into "produced nothing" — the signature of a harness
+that *engages* the task rather than bouncing off it. **Claude failed nothing (12/12).** Cost/latency
+is first-class:
 **55 cells timed out** — `goose` alone burned **18** on `qwen3:8b`, so its ~1.0 headline there is over
 just the 9 cells it finished; read it *with* the `TO` column. On token efficiency `ollama`@`qwen3:8b`
 is most frugal (369 successes/Mtok), `aider` competitive (108–142), and Claude's quality is highest
@@ -152,7 +178,57 @@ at a metered ~$1.4/run (a cache-inflated upper bound).
 - **Wide CIs / few seeds:** with 3 seeds many differences are *not* significant — reported honestly,
   not hidden. `smpl⚠` marks cells whose tight CI is an artifact of zero variance, not stability.
 
-## 6. Reproduce
+## 6. Claude *as the model* behind the lean harnesses (a frontier slice)
+
+The v1/v2 batteries run `claude` as a whole *harness* (Claude Code driving its own tools). A natural
+follow-on: hold the **model** as Claude but swap the **harness** — i.e. put a frontier model *behind*
+the lean harnesses and see what changes. Since the harnesses speak Ollama/OpenAI HTTP and Claude
+speaks the Anthropic API, we bridge them with **`crucible/proxy/claude-shim.js`**: an
+Ollama/OpenAI-compatible endpoint that answers each request by shelling out to the authenticated
+`claude -p` (Claude Code, tools OFF → a plain text completion) using the **logged-in session** (no
+API key). The wiring reuses the metering path unchanged: `harness → Crucible proxy (meters) → shim →
+claude -p`. Run it with `OLLAMA_UPSTREAM=<shim>` and `HARNESS_MODEL=claude-opus-4-8`.
+
+**Scorecard (`crucible/results/SCORECARD-claude.md`, 23 runs):**
+
+| Harness | n | TO | Score [95% CI] | Completion | Path | State | Cost/run | Succ/Mtok |
+|---|--:|--:|---|--:|--:|--:|--:|--:|
+| aider | 9 |  | **0.98** [0.96, 1] | 1 | 1 | 0.89 | **$1.59** | **3** |
+| ollama | 9 |  | **0.97** [0.95, 0.99] | 1 | 0.98 | 0.89 | **$0.27** | **26** |
+| mock (floor) | 1 |  | 1.00 | — | — | — | $0 | — |
+| pi · hermes · goose · openclaw | 0 | 1 ea | _all timed out_ | — | — | — | — | — |
+
+Four findings, each a clean instance of a core principle:
+
+- **6.1 A frontier model compresses Score (P8).** Both text-format harnesses pass **9/9** and land at
+  0.97–0.98 — `aider` vs `ollama` is Δ=**0.004** [0, 0.011], **not significant**. With a strong enough
+  model the harness barely moves the *quality* number. This is the expected compression, not a null
+  result: the discriminating power that mid-size models gave us (§5.1) flattens at the top.
+- **6.2 …so Cost becomes the discriminator (P7).** What Score no longer separates, cost does — and
+  loudly: `aider` costs **$1.59/run** at **3** successes/Mtok, `ollama` **$0.27/run** at **26**
+  (~6× cheaper, ~9× more token-efficient). `aider`'s `tool-recover` cells alone burned **613k–875k**
+  input tokens each (many iterations, each re-sending accumulated context) versus `ollama`'s ~24k.
+  On top of that, *every* shim call carries a ~22k-token Claude Code system-prompt baseline — the
+  "using-Claude-Code-as-a-model" tax, metered honestly. Exactly why Score never folds in cost.
+- **6.3 A strong model erodes a tool-discriminating task.** `tool-recover` is built so a file-only
+  harness *must* fail — it has to run a two-phase generator to produce a 200-entry fixture ("do not
+  hand-write it"). With a weak local model that held. With Claude, **`ollama` passes it (0.933)**:
+  the run executed **zero commands** and Claude simply **hand-wrote all 200 fixture entries**. The
+  outcome-based verifier can't tell (it just runs the test); only **State docked it (0.667)**. The
+  lesson is about task design — to stay discriminating against strong models, a tool-required task
+  must make the artifact genuinely uncomputable-by-hand (seeded/networked/secret) or have the tool
+  emit a proof-of-execution the verifier checks.
+- **6.4 Only text-format harnesses can drive Claude here — the §5.2 split, at the harness level.**
+  `ollama` and `aider` communicate edits as *text* (file blocks / search-replace), so a plain
+  completion suffices. The tool-calling harnesses (`pi`, `hermes`, `goose`, `openclaw`) need the
+  model to emit **structured tool-calls**, which `claude -p` (Claude Code's own tools, not arbitrary
+  external schemas) cannot produce — and a subscription/OAuth login gives no raw Messages-API access
+  to translate OpenAI↔Anthropic tool-calls. So all four **time out** waiting for a tool-call that
+  never comes. (`codex` is excluded: its reserved `ollama` provider bypasses the proxy, so it can't
+  be pointed at the shim at all.) The same structural fault line as the reasoning-model result:
+  *what shape the interface expects* decides whether a harness can use a given model.
+
+## 7. Reproduce
 
 ```bash
 # prerequisites: ollama running with the probe models; node 22; (claude CLI for the frontier slice)
@@ -167,12 +243,17 @@ node crucible/report.js crucible/results/battery.jsonl
 
 # one instrumented run:
 CRUCIBLE=1 HARNESS_MODEL=qwen3:8b SEED=1 ./loop.sh crucible/tasks/tool-recover pi 6
+
+# §6 frontier slice — Claude as the MODEL behind a lean harness (uses the logged-in claude CLI):
+node crucible/proxy/claude-shim.js --portfile /tmp/shim.port &   # bridge: Ollama/OpenAI -> claude -p
+CRUCIBLE=1 HARNESS_MODEL=claude-opus-4-8 OLLAMA_UPSTREAM="http://127.0.0.1:$(cat /tmp/shim.port)" \
+  ./loop.sh tasks/hello-sum ollama 4
 ```
 
 The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-checked
 (`.github/workflows/crucible.yml`).
 
-## 7. Reading it honestly (caveats)
+## 8. Reading it honestly (caveats)
 
 - **Cost for Claude is an upper bound** — `claude.sh` counts cache tokens at full rate (no cache
   discount), so its reported $ overstates the real spend.
@@ -188,3 +269,9 @@ The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-che
   discriminating probes.
 - **Timed-out cells are logged, not dropped** — a hung cell is killed at its `wall_timeout_s` and
   left absent so a resume retries it; the battery summary reports the count.
+- **The §6 Claude slice is a plain-text completion, not agentic Claude Code** — the shim runs
+  `claude -p` with tools OFF via the *logged-in session* (OAuth, no API key), so it measures the lean
+  harness driving Claude *as a raw model*, not Claude Code's own tool-use. Its cost is the same
+  cache-inflated upper bound, inflated further by a ~22k-token per-call Claude Code system-prompt
+  baseline. Tool-calling harnesses can't be measured this way (§6.4) — a limitation of the bridge,
+  recorded as timeouts, not a harness score.
