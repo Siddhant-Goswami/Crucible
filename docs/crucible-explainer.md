@@ -200,7 +200,7 @@ place. They don't.
 |---|---|---|
 | **aider** | Worked on **every** model (weak, strong, and weird) | The reliable all-rounder — see below |
 | **ollama** (our bare-bones control) | Mediocre-to-good, scaled with the model | A useful "floor": this is what almost-no-harness gets you |
-| **pi / hermes / goose** | Great on one model, **zero** on the others | Powerful but fragile — they only work in the right conditions |
+| **pi / hermes / goose** | Good on one model (`qwen3`), **zero** on the others — and even on `qwen3`, `pi`/`goose` often *time out* (finish only 70% / 33% of the time) | Powerful but fragile — and once you count a hang as a failure, `goose` drops from ~1.0 to **0.33**. `hermes` is the reliable one of the three. |
 | **codex** | **Zero. On all 77 runs.** | A perfect example of the harness being the broken part |
 | **claude** (frontier reference) | Perfect (1.0), but costs real money | The quality ceiling — at ~$1.40 a run vs. free locally |
 

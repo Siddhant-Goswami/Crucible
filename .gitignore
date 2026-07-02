@@ -25,6 +25,9 @@ loops/01-grading-loop/review-queue/
 # crucible benchmark — generated battery artifacts (the spec, code, schemas & tasks ARE tracked)
 crucible/results/*.jsonl
 crucible/results/*.log
+# ...but the FROZEN published snapshot IS tracked, so the writeup's numbers are reproducible
+# from committed data and the docs↔data claims guard can run in CI (crucible/audit-claims.js).
+!crucible/results/battery.published.jsonl
 
 # aider harness local droppings (created when the aider adapter runs)
 .aider.chat.history.md

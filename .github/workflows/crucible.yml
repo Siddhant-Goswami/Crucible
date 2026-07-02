@@ -34,3 +34,12 @@ jobs:
             echo "  parse $d/task.yaml"
             node crucible/lib/taskmeta.js "$d" >/dev/null
           done
+
+      - name: Docs↔data claims guard (no stale numbers in the writeup)
+        run: node crucible/audit-claims.js crucible/results/battery.published.jsonl
+
+      - name: SCORECARD.md is regenerated from the published ledger
+        run: |
+          node crucible/report.js crucible/results/battery.published.jsonl >/dev/null
+          git diff --exit-code crucible/results/SCORECARD.md \
+            || (echo "::error::SCORECARD.md is stale — regenerate: node crucible/report.js crucible/results/battery.published.jsonl" && exit 1)
