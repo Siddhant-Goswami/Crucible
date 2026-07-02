@@ -56,7 +56,7 @@ Responses-capable translation is added to the proxy (it currently meters `/api/*
 
 - **pi's T1 sweep is the arm's positive result**: first perfect local tool-recover sweep on any
   model — the generic OpenAI-dialect harness converts qwen3.5's tool calls where codex cannot.
-- **27/36 tool-caller cells timed out.** Direct evidence of runaway thinking exists for
+- **30/36 tool-caller cells timed out.** Direct evidence of runaway thinking exists for
   `api-migration pi s1`: one `/v1/chat/completions` request spanning the entire 600s budget
   (server log `15:37:50 | 500 | 9m58s`). The effective think mode was the serving default (ON
   via `/v1`) — the §5A.2 mode-pinning hazard, live.
@@ -77,7 +77,7 @@ Responses-capable translation is added to the proxy (it currently meters `/api/*
 | hermes | 0×3 fin | 0×3 fin | 0×3 fin | 0×3 fin | 0 |
 | goose | TO, 0, 0 | 0.017, 0, 0 | 0×3 fin | 0, 0.04, 0 | ≈0.005 |
 
-- Tool-caller timeouts fell **27/36 → 3/36**. `pi @ qwen3.5:9b` (think off) is the strongest
+- Tool-caller timeouts fell **30/36 → 3/36**. `pi @ qwen3.5:9b` (think off) is the strongest
   local tool-calling pair measured in this program.
 - **Think-ON replication slice** (`qwen35-think-on-repl.jsonl`, api-migration × pi × 3, healthy
   host, think pinned true): **1.0 / 0.883 / 1.0, zero timeouts** — the same cells that were
@@ -102,6 +102,27 @@ runs, so *cell order becomes a confound* (late cells time out more). We nearly p
 health per cell (swap-used + a tok/s canary), (b) randomize/interleave cell order across arms,
 (c) health-gate between tiers (unload model, require canary ≥ threshold), and (d) extend the
 timeout autopsy with a HOST_DEGRADED class (cut-off-working while the canary was below bar).
+
+## hermes patched slice (`qwen35-hermes-fix.jsonl`, 2026-07-03) — the zero migrates classes
+
+Fix: derived tag `qwen35-9b-ctx16k` (`FROM qwen3.5:9b` + `PARAMETER num_ctx 16384`; same weights,
+digest-verified full-prompt evaluation of 6017 tokens). Evidence for the fault: hermes' own
+request dump shows it SENDS the full ~5.3k-token request (20k-char system prompt, 25 tools,
+`max_tokens: 65536`) — the truncation was server-side (num_ctx 4096 default).
+
+Result: **0/12 passes, 0 timeouts, 12/12 `budget_exhausted`**, 97k–195k input tokens per cell
+(best partials 0.05/0.033). Post-fix hermes engages fully and iterates hard, but its
+context-resend loop exhausts every task's token budget without converging on this model —
+while the same harness was the **top qwen3:8b pair (0.91)** in the pilot.
+
+Reading: the fix migrated hermes' zero from *infrastructure* (truncated transport — not a
+measurement of the harness at all) to **token-overbudget** — the host-independent,
+harness-attributable class of the timeout-autopsy taxonomy. With this slice, every class in that
+taxonomy now has a live population in the qwen3.5 study: **hang** (codex, dialect chain),
+**wall-clock-within-budget** (arm-1 host thrash), **token-overbudget** (hermes patched). Same
+Goodput 0; three different owners; only trajectory evidence tells them apart — the study's
+thesis in one row of failures. (H2 corollary: hermes' advantage on qwen3:8b did not transfer
+one generation forward within the same family.)
 
 ## Think-mode pinning (implemented 2026-07-02)
 
