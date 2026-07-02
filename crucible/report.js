@@ -31,7 +31,7 @@ const rows = fs.readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean).map(JSO
 if (!rows.length) { console.error('empty ledger: ' + LEDGER); process.exit(1); }
 
 // ---- helpers -----------------------------------------------------------------
-const { mean, median, bootCI, pairedBoot, priceRun, priceRunCloud } = require('./lib/stats');
+const { mean, median, passK, bootCI, pairedBoot, priceRun, priceRunCloud } = require('./lib/stats');
 const r2 = x => Math.round(x * 100) / 100;
 const r3 = x => Math.round(x * 1000) / 1000;
 const pct = x => Math.round(x * 100);
@@ -148,6 +148,20 @@ if (totalTimeouts) md.push(`_**TO** = cells that exceeded their \`wall_timeout_s
 md.push('');
 md.push('_Seed: **pin** = adapter pinned the RNG seed (reproducible); **smpl** = the N seeds are independent samples (the adapter has no seed knob), so the CI reflects run-to-run variance, not a reproducible seed. **smpl⚠** = multi-seed cell with **zero** variance among finished runs and no seed pin — its tight CI is an artifact (likely a deterministic/greedy harness), not evidence of stability._');
 md.push('');
+md.push('**Reliability — pass^k (τ-bench).** Probability that *k* independent attempts ALL pass — a');
+md.push('consistency metric, not a peak. pass^1 = success rate; a harness that solves-then-flakes drops');
+md.push('steeply from pass^1 → pass^3. A timeout counts as a non-pass. (`—` = fewer than k attempts.)');
+md.push('');
+md.push('| Harness | Model | attempts | passes | pass^1 | pass^2 | pass^3 |');
+md.push('|---|---|--:|--:|--:|--:|--:|');
+for (const k of Object.keys(cells).sort()) {
+  const c = cells[k]; const nAll = c.runs.length + c.timeouts;
+  if (!nAll) continue;
+  const passes = c.runs.filter(r => r.result === 'passed').length;
+  const pk = j => { const v = passK(passes, nAll, j); return v == null ? '—' : r2(v); };
+  md.push(`| ${c.adapter} | ${c.model} | ${nAll} | ${passes} | ${pk(1)} | ${pk(2)} | ${pk(3)} |`);
+}
+md.push('');
 
 // 2. Per-tier goodput (the routing signal)
 md.push('## 2. Per-tier goodput (P8 — where the harness has headroom)');
@@ -197,14 +211,16 @@ md.push('');
 // 4. Routing table — the deliverable: when to use which (harness, model), local vs cloud
 md.push('## 4. Routing table — when to use which (harness, model), local vs cloud');
 md.push('');
-md.push('For each task tier: the best **local** `(harness @ model)` by Goodput and what it costs in');
-md.push('latency, vs the **cloud** reference (Claude). *Verdict*: **✅ local** = a local pair clears the');
-md.push('bar (Goodput ≥ 0.7 at ≥ 80% reliability); **☁️ escalate** = cloud beats the best local by ≥ 0.3');
-md.push('Goodput; **⚠️ hard** = nothing clears the bar here. This is the signal difficulty-based routers');
+md.push('For each task tier: the best **local** `(harness @ model)` by Goodput and its latency, vs the');
+md.push('best **cloud** `(harness @ model)` and its $/run. *Verdict*: **✅ local** = a local pair clears');
+md.push('the bar (Goodput ≥ 0.7 at ≥ 80% reliability); **☁️ escalate** = cloud beats the best local by');
+md.push('≥ 0.3 Goodput; **⚠️ hard** = nothing clears the bar. This is the signal difficulty-based routers');
 md.push('(RouteLLM, Hybrid-LLM) lack: route on the *task\'s tool/capability tier*, not just prompt length.');
 md.push('');
-const LOCAL_MODELS = models.filter(m => !m.startsWith('claude'));
-const CLOUD_MODEL = models.find(m => m.startsWith('claude'));
+// Cloud vs local by naming convention: a LOCAL model is "<name>:<size>" (has a colon); a cloud
+// model (claude-opus-4-8, gpt-5.5, gpt-4o-mini) has none.
+const LOCAL_MODELS = models.filter(m => m.includes(':'));
+const CLOUD_MODELS = models.filter(m => !m.includes(':'));
 const tierRows = rows.reduce((acc, r) => { (acc[tierOf(r.task)] ||= []).push(r); return acc; }, {});
 function cellGoodput(adapter, model, tier) {
   const rs = (tierRows[tier] || []).filter(r => r.adapter === adapter && r.model === model);
@@ -213,30 +229,34 @@ function cellGoodput(adapter, model, tier) {
   return {
     gp: mean(rs.map(r => r.score ?? 0)), rel: rs.length ? fin.length / rs.length : 0,
     lat: median(fin.map(r => r.wall_ms || 0)), n: rs.length,
+    cost: fin.length ? fin.reduce((s, r) => s + priceRun(r, pricing), 0) / fin.length : null,
   };
 }
+const bestOver = (modelSet, t) => {         // best (adapter, model) over a model set for a tier
+  let best = null, key = '—';
+  for (const a of adapters) for (const m of modelSet) {
+    const g = cellGoodput(a, m, t); if (!g) continue;
+    if (!best || g.gp > best.gp) { best = g; key = `${a}@${m}`; }
+  }
+  return best ? { ...best, key } : null;
+};
 const TIER_LABEL = { T0: 'T0 floor', T1: 'T1 tool-recover', T2: 'T2 long-horizon', T3: 'T3 evidence', T4: 'T4 safety' };
-md.push('| Tier | Best local (harness@model) | local Goodput | Rel% | p50 lat (s) | Cloud (claude) Goodput | Cloud $/run | Verdict |');
-md.push('|---|---|--:|--:|--:|--:|--:|:--|');
+md.push('| Tier | Best local (harness@model) | Goodput | Rel% | lat(s) | Best cloud (harness@model) | Goodput | $/run | Verdict |');
+md.push('|---|---|--:|--:|--:|---|--:|--:|:--|');
 for (const t of tiers) {
   if (t === '?') continue;
-  let best = null, bestKey = '—';
-  for (const a of adapters) for (const m of LOCAL_MODELS) {
-    const g = cellGoodput(a, m, t); if (!g) continue;
-    if (!best || g.gp > best.gp) { best = g; bestKey = `${a}@${m}`; }
-  }
-  const cg = CLOUD_MODEL ? cellGoodput('claude', CLOUD_MODEL, t) : null;
-  const cloudRuns = (tierRows[t] || []).filter(r => r.adapter === 'claude' && !r.timed_out);
-  const cloudPer = cloudRuns.length ? cloudRuns.reduce((s, r) => s + priceRun(r, pricing), 0) / cloudRuns.length : null;
+  const best = bestOver(LOCAL_MODELS, t);
+  const cloud = bestOver(CLOUD_MODELS, t);
   let verdict;
-  if (best && best.gp >= 0.7 && best.rel >= 0.8) verdict = `✅ local — ${bestKey}`;
-  else if (cg && best && (cg.gp - best.gp) >= 0.3) verdict = '☁️ escalate to cloud';
-  else if (cg && !best) verdict = '☁️ cloud only';
-  else verdict = `⚠️ hard — best ${bestKey} @ ${best ? r2(best.gp) : '—'}`;
-  md.push(`| ${TIER_LABEL[t] || t} | ${bestKey} | ${best ? r2(best.gp) + ' [' + best.n + ']' : '—'} | ${best ? pct(best.rel) + '%' : '—'} | ${best ? (best.lat / 1000).toFixed(1) : '—'} | ${cg ? r2(cg.gp) : '—'} | ${cloudPer == null ? '—' : '$' + cloudPer.toFixed(2)} | ${verdict} |`);
+  if (best && best.gp >= 0.7 && best.rel >= 0.8) verdict = `✅ local — ${best.key}`;
+  else if (cloud && best && (cloud.gp - best.gp) >= 0.3) verdict = `☁️ escalate — ${cloud.key}`;
+  else if (cloud && !best) verdict = `☁️ cloud only — ${cloud.key}`;
+  else verdict = `⚠️ hard — best ${best ? best.key + ' @ ' + r2(best.gp) : '—'}`;
+  const cloudCost = cloud && cloud.cost != null ? (cloud.cost === 0 ? '$0*' : '$' + cloud.cost.toFixed(2)) : '—';
+  md.push(`| ${TIER_LABEL[t] || t} | ${best ? best.key : '—'} | ${best ? r2(best.gp) + ' [' + best.n + ']' : '—'} | ${best ? pct(best.rel) + '%' : '—'} | ${best ? (best.lat / 1000).toFixed(1) : '—'} | ${cloud ? cloud.key : '—'} | ${cloud ? r2(cloud.gp) : '—'} | ${cloudCost} | ${verdict} |`);
 }
 md.push('');
-md.push('_`[n]` = attempts behind the best-local pick. Where local ties cloud on Goodput the verdict is **✅ local** — the routing win is the **cost**: local matches quality here at ~$0 and modest latency while Claude runs **$0.72–$1.70/run**. The catch a difficulty-router misses: the winning pair is tier-specific (`pi@qwen3` for T1, `aider@deepseek-r1:8b` for T2) — you need this table to pick it, not prompt length._');
+md.push('_`[n]` = attempts behind the best-local pick. `$0*` = a cloud model run via a **subscription** (codex@gpt-5.5 on a ChatGPT plan), not a metered API — no per-token charge here, so read it as "subscription", not "free at scale". Where local ties cloud on Goodput the verdict is **✅ local**: the win is cost + latency, since a well-chosen local pair matches cloud quality per tier. The catch a difficulty-router misses: the winning pair is tier-specific — you need this table to pick it, not prompt length._');
 md.push('');
 // 4b. The other routing question: your local model is fixed (it's what fits your GPU) — which tiers escalate?
 md.push('**If your local model is fixed** (it usually is — whatever fits your GPU), which tiers still need');

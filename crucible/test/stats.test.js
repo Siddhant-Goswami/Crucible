@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { mean, median, bootCI, pairedBoot, priceRun, priceRunCloud } = require('../lib/stats');
+const { mean, median, passK, bootCI, pairedBoot, priceRun, priceRunCloud } = require('../lib/stats');
 
 const zero = () => 0;   // deterministic RNG: always sample index 0
 
@@ -37,6 +37,16 @@ test('priceRun: claude keyed directly, local models => $0', () => {
   assert.strictEqual(priceRun({ model: 'qwen3:8b', tokens_in: 1e6, tokens_out: 1e6 }, pricing), 0);
   assert.strictEqual(priceRun({ model: 'baseline', tokens_in: 5, tokens_out: 5 }, pricing), 0);
   assert.strictEqual(priceRun({ model: 'deepseek-r1:1.5b', tokens_in: 9, tokens_out: 9 }, pricing), 0); // unknown => $0
+});
+
+test('passK: pass^1 = success rate, drops for flaky, null when n<k', () => {
+  assert.strictEqual(passK(3, 3, 1), 1);                 // 3/3 pass
+  assert.strictEqual(passK(3, 3, 3), 1);                 // all three pass together
+  assert.strictEqual(passK(0, 3, 1), 0);
+  assert.strictEqual(passK(2, 4, 1), 0.5);               // pass^1 = c/n
+  assert.strictEqual(passK(2, 4, 2), (2 * 1) / (4 * 3)); // pass^2 without replacement = 1/6
+  assert.strictEqual(passK(1, 2, 3), null);              // fewer attempts than k
+  assert.strictEqual(passK(0, 0, 1), null);
 });
 
 test('median: odd, even, empty', () => {

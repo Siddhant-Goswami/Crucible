@@ -107,6 +107,25 @@ for (const m of ['deepseek-r1:1.5b', 'deepseek-r1:8b']) {
   claim(`${m}: T1 tool-recover needs cloud (best-local goodput < 0.5)`, gp < 0.5, `best-local=${gp.toFixed(2)}`);
 }
 
+// --- cloud slice (§6.5): the codex bookend — only assert if the cloud slice is in the ledger ---
+if (finished(sel('codex', 'gpt-5.5')).length) {
+  const cc = sel('codex', 'gpt-5.5'); const ccPass = passes(cc);
+  // 10. codex is 0 on every LOCAL model but passes on a capable cloud model — the harness was never
+  //     broken; it needed a model that can emit its tool-call protocol.
+  claim('codex bookend: 0 passes on local, but ≥3/4 on cloud gpt-5.5',
+    codexPass === 0 && ccPass >= 3, `local=${codexPass} cloud=${ccPass}/${finished(cc).length}`);
+  // 11. Specifically it clears T1 tool-recover on cloud — the tool-required task it structurally failed locally.
+  claim('codex@gpt-5.5 passes T1 tool-recover (structural 0 locally → works on a capable cloud model)',
+    passes(sel('codex', 'gpt-5.5', 'tool-recover')) >= 1, `${passes(sel('codex', 'gpt-5.5', 'tool-recover'))} pass`);
+}
+// 12. A metered mid cloud model behind a TEXT harness still can't do tool-recovery: aider@gpt-4o-mini
+//     fails T1 (needs a tool-driving harness AND a capable model), even though it passes the rest.
+if (finished(sel('aider', 'gpt-4o-mini')).length) {
+  const trPass = passes(sel('aider', 'gpt-4o-mini', 'tool-recover'));
+  claim('aider@gpt-4o-mini fails T1 tool-recover (text harness + mid cloud model — tool-recovery needs both)',
+    trPass === 0, `${trPass} pass`);
+}
+
 // --- report -------------------------------------------------------------------
 let failed = 0;
 console.log(`\nCrucible claims audit — ${rows.length} runs from ${path.relative(path.join(__dirname, '..'), LEDGER)}\n`);

@@ -283,8 +283,39 @@ Four findings, each a clean instance of a core principle:
   tool-calls both ways** — OpenAI `tools`/`tool_calls` ↔ Anthropic `tools`/`tool_use`/`tool_result`. A
   tool-calling harness pointed at it gets real structured tool-calls back, so `pi`/`hermes`/`goose` can
   finally be measured on a cloud Claude model (metering flows through the normal proxy unchanged; the
-  translation is unit-tested in `crucible/test/anthropic-shim.test.js`). The battery slice itself is
-  left for a run with a key (see §7); this closes the *mechanism* gap, not yet the data gap.
+  translation is unit-tested in `crucible/test/anthropic-shim.test.js`). This closes the *mechanism*
+  gap for Anthropic; the actual cloud **data** we gathered used OpenAI instead — §6.5.
+
+### 6.5 The `codex` bookend — a structural 0 on local, works on a capable cloud model (P1/P2)
+The sharpest confirmation of the whole thesis. `codex` scored **0 across all 77 local cells** (§5.4)
+because the local models can't emit its structured tool-call protocol. Run the *same* `codex` harness
+on a capable cloud model — **gpt-5.5**, via its native OpenAI provider (Codex's home turf) — and it
+one-shots the discriminating tasks:
+
+| Harness @ model | tool-recover | api-migration | secret-redaction | temp-convert | pass^1/^2/^3 |
+|---|:--:|:--:|:--:|:--:|:--:|
+| `codex` @ *local* (all 3 models) | — | — | — | — | **0 / 0 / 0** (0/35) |
+| **`codex` @ gpt-5.5** (cloud, tool-calling) | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | **1 / 1 / 1** |
+| `aider` @ gpt-4o-mini (cloud, **metered**, text) | ✗ 0.01 | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | 0.75 / 0.5 / 0.25 |
+
+Three readings, each a core principle:
+- **The harness was never broken (P1/P2).** `codex` 0→1.0 on a model swap alone, harness held fixed,
+  is the cleanest possible "measure the pair, not the harness": its local 0 was a *model-interface*
+  failure, not a capability one. On gpt-5.5 it passes `tool-recover` (the tool-required task) in **one
+  iteration**, and holds `Safety=1` on the injection task.
+- **Tool-recovery needs BOTH a tool-driving harness AND a capable model.** `aider` (text diff-blocks,
+  not structured tools) on the mid `gpt-4o-mini` clears the ordinary tasks but **fails `tool-recover`**
+  (0.013, burning 30k tokens), exactly as it failed T1 on every local model (§5.7). Cloud alone
+  doesn't save a text harness on a tool-required task; `codex`+gpt-5.5 (tool-calling + strong model)
+  does. Its pass^k falls 0.75→0.25 precisely because of that one flaky tier.
+- **Metered cloud cost is real and tiny here (P7).** `aider@gpt-4o-mini` ran through the normal proxy
+  (`OPENAI_API_BASE` → proxy → OpenAI) at **~$0.0018/run** and **496 tok/s** — genuine metered API
+  spend, versus `codex@gpt-5.5` which ran on a **ChatGPT subscription** (`$0*` — unmetered, not free at
+  scale) and `claude` at $0.72–$1.70/run. All three now sit in the §3/§4 economics + routing tables.
+
+(We used **OpenAI** for this slice — `codex` on its native ChatGPT-account model, and `aider` on a
+metered `gpt-4o-mini` API key — rather than the Anthropic shim of §6.4; both are cloud demonstrations,
+and both findings are pinned in `audit-claims.js`.)
 
 ## 7. Reproduce
 
@@ -312,6 +343,18 @@ export ANTHROPIC_API_KEY=sk-ant-...                              # a real API ke
 node crucible/proxy/anthropic-shim.js --portfile /tmp/ashim.port &   # bridge: OpenAI/Ollama tools <-> Anthropic
 CRUCIBLE=1 HARNESS_MODEL=claude-opus-4-8 OLLAMA_UPSTREAM="http://127.0.0.1:$(cat /tmp/ashim.port)" \
   ./loop.sh crucible/tasks/tool-recover pi 6                     # pi/hermes/goose now get real tool-calls
+
+# §6.5 — the OpenAI cloud slice we actually ran:
+CLOUD="crucible/tasks/tool-recover crucible/tasks/api-migration crucible/tasks/secret-redaction tasks/temp-convert"
+#  (a) codex on its NATIVE cloud model (ChatGPT-account login; a cloud model has no ":" so codex.sh
+#      switches off --oss). Subscription, so proxy tokens read 0 ($0*):
+TASKS="$CLOUD" ADAPTERS=codex MODELS=gpt-5.5 SEEDS=1 LEDGER=crucible/results/cloud-battery.jsonl \
+  bash crucible/matrix.sh
+#  (b) aider on a METERED OpenAI key (proxy -> OpenAI, real $ + tokens):
+export OPENAI_API_KEY=sk-...
+TASKS="$CLOUD" ADAPTERS=aider MODELS=gpt-4o-mini SEEDS=1 RESUME=1 \
+  OLLAMA_UPSTREAM=https://api.openai.com LEDGER=crucible/results/cloud-battery.jsonl \
+  bash crucible/matrix.sh
 ```
 
 The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-checked
