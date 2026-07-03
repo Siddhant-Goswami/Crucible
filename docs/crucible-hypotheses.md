@@ -273,6 +273,10 @@ failure), 0 mid-run hangs, 0 token-overbudget. Accordingly:
 - **Budgets:** `wall_timeout_s` is re-fit per (model, host) as k× that model's median finished-run
   wall time on the T0 floor (k frozen before the battery; k=5 unless amended), keeping the token
   budget as the host-independent primary cap. Wall-clock Goodput is labeled host-conditional.
+  *Frozen (2026-07-03, `fit-timeouts.js` → `timeout-fits.json`, applied by `matrix.sh` as a
+  model-conditioned FLOOR — `effective_wt = max(task wt, fit)`):* `deepseek-r1:1.5b` 300s ·
+  `qwen3:8b` 360s · `deepseek-r1:8b` 390s. Models without T0 ledger data (all qwen3.5 variants)
+  are **UNFIT** and must run a T0 calibration slice before entering the scaled battery.
 
 ### 5A.2 H3b re-mechanized: inline-vs-out-of-band reasoning, de-confounded on qwen3.5
 Live probes: `qwen3.5:9b` (and `qwen3:8b` on the same stack) return reasoning in a **separate

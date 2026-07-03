@@ -105,7 +105,15 @@ for task in $TASKS; do
       continue
     fi
     for m in "${MOD[@]}"; do
-      for s in "${SEED_ARR[@]}"; do cell "$td" "$name" "$a" "$m" "$s" "$mi" "$mt" "$wt"; done
+      # §5A.1 per-(model,host) wall-timeout fit: results/timeout-fits.json (fit-timeouts.js) is a
+      # model-conditioned FLOOR — effective wt = max(task wt, fit). Slow models gain budget so
+      # Goodput stops baking host/model latency into the score; absent/UNFIT models keep task wt.
+      mwt="$wt"
+      if [ -z "${WALL_TIMEOUT_OVERRIDE:-}" ] && [ -f "$ROOT/crucible/results/timeout-fits.json" ]; then
+        fit="$(node -e "try{const f=require('$ROOT/crucible/results/timeout-fits.json').fits['$m'];if(f)console.log(f)}catch{}" 2>/dev/null)"
+        [ -n "$fit" ] && [ "$fit" -gt "$mwt" ] 2>/dev/null && mwt="$fit"
+      fi
+      for s in "${SEED_ARR[@]}"; do cell "$td" "$name" "$a" "$m" "$s" "$mi" "$mt" "$mwt"; done
     done
   done
 done
