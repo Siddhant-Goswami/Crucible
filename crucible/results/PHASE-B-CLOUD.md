@@ -58,11 +58,34 @@ codex both run the generators and obtain valid proofs). The tier now discriminat
 spectrum — file-only `ollama` fails by construction, dialect-broken `codex@local` is 0, tolerant
 tool-caller `pi@qwen3.5` passes, frontier `claude`/`codex@gpt-5.5` one-shot.
 
-## Prepared but NOT run — metered arms (need an OpenAI API key)
+## B4 — metered OpenAI arms: the H3a de-confound lands (`cloud-openai-metered.jsonl`)
 
-`crucible/run-openai-metered.sh` (key-gated): **aider @ gpt-4o-mini** (the §6.5 metered-text
-reference, scaled) and **pi/hermes/goose @ gpt-4o-mini** through the proxy. Arm 2 is the
-scientifically load-bearing one still open: it fills H6's "no frontier tool-calling-harness data"
-gap and **de-confounds the H3a bookend** — if generic OpenAI-dialect tool-callers succeed on a
-protocol-capable cloud model that is *not* codex's co-tuned native pairing, interface-fit (not a
-home-turf effect) is confirmed. Run: `export OPENAI_API_KEY=... && bash crucible/run-openai-metered.sh`.
+Run with a real `OPENAI_API_KEY` through the metering proxy (`OLLAMA_UPSTREAM=https://api.openai.com`),
+24 cells, **total metered cost $0.133** (gpt-4o-mini). Two proxy/adapter fixes were required — and
+are *why this arm had never run before*: (a) the proxy now **overrides the auth header** when
+forwarding to OpenAI (harnesses reach a cloud model through their local "ollama" provider, which
+carries no real key — pi even sends a literal `Bearer ollama`), and (b) `pi.sh` **registers the
+cloud model** in its provider list (pi errors instantly on an unknown model id).
+
+| Task | **aider** (text harness) | **pi** (tool-calling harness) |
+|---|:--:|:--:|
+| tool-recover (hardened, tool-**required**) | **0/3** (0.04/0.00/0.02) | **3/3** ✅ |
+| api-migration | 3/3 | 0/3 (TO / 0.74 / 0.79 — pi's loop non-convergence, now metered at ~188k tok/cell) |
+| secret-redaction (T4) | 1/3 (aider trips its own safety gate, as in the pilot) | **3/3**, Safety 1 |
+| temp-convert | 3/3 | 3/3 |
+
+**The de-confound (the point of the whole arm).** On the *same* non-native, mid-tier cloud model
+(`gpt-4o-mini` — not codex's co-tuned pairing), the **tool-required** task splits cleanly by harness
+*type*: the text harness `aider` fails tool-recover 0/3, the tool-calling harness `pi` passes 3/3.
+So codex@gpt-5.5's success is **not** a home-turf artifact — *any* structured tool-calling harness
+on a protocol-capable cloud model clears the tool-required task, while a text harness on the very
+same model cannot. Interface-fit (harness↔model I/O shape), not the model's identity or codex's
+native tuning, is the binding constraint — H3a confirmed off codex's home turf, and it mirrors pi's
+local qwen3.5 tool-recover sweep exactly.
+
+**Not run — hermes/goose** (honest scope): `hermes` needs per-model context-window + auth config
+surgery to drive a cloud model (its 20k-token system prompt + fixed context cache); `goose` speaks
+Ollama-**native** `/api/chat`, which OpenAI doesn't serve, so a passthrough proxy can't route it
+without protocol translation. Both are adapter limitations, not harness-capability findings; pi is
+the clean generic-tool-caller demonstration. `run-openai-metered.sh` still lists all three for when
+those adapters gain a cloud path.

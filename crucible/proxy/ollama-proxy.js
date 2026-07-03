@@ -91,6 +91,16 @@ const server = http.createServer((creq, cres) => {
   // gzip/deflate response would be parsed as raw UTF-8 and yield no token counts.
   const headers = { ...creq.headers, host: UPSTREAM.host };
   delete headers['accept-encoding'];
+  // OVERRIDE the auth header when forwarding to OpenAI. Harnesses that reach a cloud model through
+  // their local "ollama" provider carry no real key — pi even sends a literal `Bearer ollama`
+  // placeholder — so their requests 401 at OpenAI and read 0 tokens. The proxy holds the real key
+  // (inherited from the run env) and replaces whatever placeholder they sent, so every OpenAI-
+  // dialect harness is metered uniformly. Scoped to the openai.com upstream so a local-Ollama run
+  // never receives a stray Authorization header.
+  if (/(^|\.)openai\.com$/.test(UPSTREAM.hostname) && process.env.OPENAI_API_KEY) {
+    delete headers.Authorization;
+    headers.authorization = 'Bearer ' + process.env.OPENAI_API_KEY;
+  }
   const opts = {
     protocol: UPSTREAM.protocol,
     hostname: UPSTREAM.hostname,

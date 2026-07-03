@@ -27,9 +27,11 @@ TASKS="${TASKS:-crucible/tasks/tool-recover crucible/tasks/api-migration crucibl
 LEDGER="${LEDGER:-$ROOT/crucible/results/cloud-openai-metered.jsonl}"
 
 echo "== Phase B metered OpenAI arms → $MODEL =="
-# aider reads OPENAI_API_BASE; the tool-callers read OLLAMA_HOST (set by loop.sh to the proxy).
-# OLLAMA_UPSTREAM points the proxy at OpenAI so it meters real API traffic.
-export OPENAI_API_BASE="https://api.openai.com/v1"
+# Routing is handled INSIDE the adapters: each reads OLLAMA_HOST (set by loop.sh to the per-run
+# proxy) and points its OpenAI endpoint there; OLLAMA_UPSTREAM tells the proxy to forward to
+# api.openai.com, so every request is metered on the way through. Only OPENAI_API_KEY +
+# OLLAMA_UPSTREAM are needed here. CANARY_MIN=0 disables the local-Ollama health gate (cloud model).
+export CANARY_MIN=0
 
 echo "-- arm 1: aider (text harness, metered)"
 TASKS="$TASKS" ADAPTERS=aider MODELS="$MODEL" SEEDS="$SEEDS" RESUME=1 \

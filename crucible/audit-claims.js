@@ -221,6 +221,17 @@ if (cloudClaudeT1) {
     cloudClaudeT1.length === 9 && passes(cloudClaudeT1) === 9 && tasks.size === 3,
     `n=${cloudClaudeT1.length} passed=${passes(cloudClaudeT1)} tasks=${tasks.size}`);
 }
+const cloudMetered = loadLedger('cloud-openai-metered.jsonl');
+if (cloudMetered) {
+  // 24. The H3a de-confound: on the SAME non-native cloud model (gpt-4o-mini), the tool-REQUIRED
+  //     task splits by harness type — text `aider` fails tool-recover, tool-calling `pi` passes.
+  //     So codex@gpt-5.5's success is interface-fit, not a home-turf/native-tuning artifact.
+  const tr = a => cloudMetered.filter(r => r.adapter === a && r.task === 'tool-recover');
+  const aiderTR = passes(tr('aider')), piTR = passes(tr('pi'));
+  claim('H3a de-confound: on gpt-4o-mini, aider(text) fails tool-recover 0/3, pi(tool-calling) passes 3/3',
+    tr('aider').length === 3 && aiderTR === 0 && tr('pi').length === 3 && piTR === 3,
+    `aider=${aiderTR}/3 pi=${piTR}/3`);
+}
 
 // --- report -------------------------------------------------------------------
 let failed = 0;

@@ -32,9 +32,17 @@ if [ -n "${CRUCIBLE:-}" ] && [ -n "${OLLAMA_HOST:-}" ] && [ -f "$PICFG" ]; then
   [ -f "$PICFG.crucible-bak" ] && mv -f "$PICFG.crucible-bak" "$PICFG"
   cp "$PICFG" "$PICFG.crucible-bak"
   trap 'mv -f "$PICFG.crucible-bak" "$PICFG" 2>/dev/null || true' EXIT INT TERM
+  # Redirect the provider's baseUrl at the Crucible proxy, and REGISTER the run's model in the
+  # provider's model list — pi errors instantly on an unknown model id. For a cloud model (no
+  # colon, e.g. gpt-4o-mini) the proxy forwards to OpenAI and overrides the auth header, so the
+  # placeholder apiKey stays; this is what lets a generic OpenAI-dialect tool-caller drive a
+  # NON-NATIVE cloud model (the H3a de-confound).
   node -e 'const fs=require("fs"),f=process.argv[1];const c=JSON.parse(fs.readFileSync(f,"utf8"));
-    if (c.providers && c.providers.ollama) c.providers.ollama.baseUrl = process.argv[2];
-    fs.writeFileSync(f, JSON.stringify(c, null, 1));' "$PICFG" "${OLLAMA_HOST%/}/v1" 2>/dev/null || true
+    const p=c.providers&&c.providers.ollama; if(p){ p.baseUrl=process.argv[2];
+      const id=process.argv[3]; p.models=p.models||[];
+      if(id && !p.models.some(m=>m.id===id)) p.models.push({id,name:id}); }
+    fs.writeFileSync(f, JSON.stringify(c, null, 1));' \
+    "$PICFG" "${OLLAMA_HOST%/}/v1" "${HARNESS_MODEL:-}" 2>/dev/null || true
 fi
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
