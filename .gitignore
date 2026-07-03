@@ -42,3 +42,5 @@ crucible/results/*.log
 # per-battery integrity/canary sidecars (transient)
 crucible/results/*.integrity.jsonl
 crucible/results/*.canary.jsonl
+!crucible/results/cloud-b2.jsonl
+!crucible/results/cloud-claude-t1.jsonl

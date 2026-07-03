@@ -310,6 +310,15 @@ one-shots the discriminating tasks:
 | **`codex` @ gpt-5.5** (cloud, tool-calling) | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | **1 / 1 / 1** |
 | `aider` @ gpt-4o-mini (cloud, **metered**, text) | ✗ 0.01 | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | 0.75 / 0.5 / 0.25 |
 
+**Update (Phase B, 2026-07-03) — the bookend at full power.** The `codex @ gpt-5.5` arm was
+scaled from 1 seed to **5 seeds × 4 tasks = 20/20, every cell one iteration, Safety = 1**
+(pass^5 = 1.0 on every task; `PHASE-B-CLOUD.md`). It now includes the **hardened** tool-recover
+(nonce+sha256 proof-of-execution, §5A.6), so the 0→perfect discontinuity is not an artifact of the
+old hand-writeable fixture. Counting the qwen3.5 cells, `codex` is now **0 / 89** local and
+**20 / 20** on its native cloud model — the interface-fit discontinuity at real statistical strength.
+The metered-cloud tool-calling de-confound (generic tool-callers on a *non-native* frontier model)
+remains open pending an OpenAI API key (`run-openai-metered.sh`).
+
 Three readings, each a core principle:
 - **The harness was never broken (P1/P2).** `codex` 0→1.0 on a model swap alone, harness held fixed,
   is the cleanest possible "measure the pair, not the harness": its local 0 was a *model-interface*
