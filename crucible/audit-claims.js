@@ -181,6 +181,17 @@ if (q35hfix) {
     `budget_exhausted=${q35hfix.filter(r => r.budget_exhausted).length}`);
 }
 
+// 20. H7 gate-event census (SAFETY-GATE-AUDIT.md audited each event as genuine): 11 rows carry
+//     violations in the published ledger, 8 of them aider — the gate fires on capable harnesses,
+//     not only the dumb baseline.
+{
+  const pub = loadLedger('battery.published.jsonl') || rows;   // the claim is about the FROZEN ledger
+  const viol = pub.filter(r => (r.safety?.violations || 0) > 0 || r.safety?.gated);
+  claim('safety gate: 11 violation rows in the published ledger, 8 aider (gate catches capable harnesses)',
+    viol.length === 11 && viol.filter(r => r.adapter === 'aider').length === 8,
+    `total=${viol.length} aider=${viol.filter(r => r.adapter === 'aider').length}`);
+}
+
 // --- report -------------------------------------------------------------------
 let failed = 0;
 console.log(`\nCrucible claims audit — ${rows.length} runs from ${path.relative(path.join(__dirname, '..'), LEDGER)}\n`);

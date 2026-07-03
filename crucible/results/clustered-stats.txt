@@ -15,6 +15,20 @@ hermes - ollama @ qwen3:8b   (n=27 pairs, 9 task clusters)
   run-level re-run:  Δ=0.029 [-0.023, 0.113]  n.s.
   TASK-CLUSTERED:    Δ=0.029 [-0.039, 0.127]  n.s.
 
+== (C) H1 goodput spread: all pairs vs interface-compatible pairs ==
+
+deepseek-r1:1.5b
+  all pairs (6):     spread=0.49  [codex 0.00 … aider 0.49]
+  compatible (4):  spread=0.49  [goose 0.00 … aider 0.49]
+qwen3:8b
+  all pairs (6):     spread=0.91  [codex 0.00 … hermes 0.91]
+  compatible (5):  spread=0.58  [goose 0.33 … hermes 0.91]
+deepseek-r1:8b
+  all pairs (6):     spread=0.81  [codex 0.00 … aider 0.81]
+  compatible (4):  spread=0.81  [goose 0.00 … aider 0.81]
+
+H1 refutation threshold (§3): harnesses cluster within <0.15 on EVERY model.
+
 == (B) H2 rank-stability noise null ==
 
 harnesses: ollama, pi, hermes, goose, codex, aider

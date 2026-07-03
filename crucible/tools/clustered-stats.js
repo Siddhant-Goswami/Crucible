@@ -104,6 +104,30 @@ const meanPairTau = (cols) => {
 const cellRuns = (h, m) => runs.filter(r => r.adapter === h && r.model === m);
 const obsTau = meanPairTau(colScores(cellRuns));
 
+// ---------- (C) H1 spread among INTERFACE-COMPATIBLE pairs ------------------------------------
+// H1 (attribution) must not double-count H3 (interface-fit): a pair whose zero is a diagnosed
+// infrastructure/dialect failure is an H3 datum, not harness-quality variation. Excluded pairs:
+//   codex × every local model  — dialect-chain structural zero (results §5.4, §6.6)
+//   hermes × deepseek-r1:*     — transport failure, 0 metered tokens (results §5.2)
+// Spread = max−min harness Goodput within a model column, reported with and without exclusions.
+const INCOMPATIBLE = new Set([
+  ...MODELS.map(m => 'codex|' + m),
+  'hermes|deepseek-r1:1.5b', 'hermes|deepseek-r1:8b',
+]);
+console.log('== (C) H1 goodput spread: all pairs vs interface-compatible pairs ==\n');
+for (const m of MODELS) {
+  const gp = h => mean(cellRuns(h, m).map(score));
+  const all = harnesses.map(h => ({ h, g: gp(h) }));
+  const compat = all.filter(({ h }) => !INCOMPATIBLE.has(h + '|' + m));
+  const spread = xs => Math.max(...xs.map(x => x.g)) - Math.min(...xs.map(x => x.g));
+  const lo = xs => xs.reduce((a, b) => (a.g < b.g ? a : b));
+  const hi = xs => xs.reduce((a, b) => (a.g > b.g ? a : b));
+  console.log(`${m}`);
+  console.log(`  all pairs (${all.length}):     spread=${spread(all).toFixed(2)}  [${lo(all).h} ${lo(all).g.toFixed(2)} … ${hi(all).h} ${hi(all).g.toFixed(2)}]`);
+  console.log(`  compatible (${compat.length}):  spread=${spread(compat).toFixed(2)}  [${lo(compat).h} ${lo(compat).g.toFixed(2)} … ${hi(compat).h} ${hi(compat).g.toFixed(2)}]`);
+}
+console.log('\nH1 refutation threshold (§3): harnesses cluster within <0.15 on EVERY model.\n');
+
 // null: common ordering by construction — pool each harness across models, resample columns
 const pooled = {};
 harnesses.forEach(h => (pooled[h] = runs.filter(r => r.adapter === h && MODELS.includes(r.model))));

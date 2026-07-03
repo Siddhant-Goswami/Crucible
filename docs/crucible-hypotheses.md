@@ -88,7 +88,12 @@ Status ∈ {**pilot-supported (in-sample)**, **preliminary**, **to pre-register 
 - **Status. Pilot-supported (in-sample).** `qwen3:8b` spans **0.00 (codex) → 0.91 (hermes)**; on
   `deepseek-r1:1.5b` aider>ollama Δ=0.37 [0.16, 0.59] **significant**. *At-risk regression:* on the
   clean-output model the *top pack* is a tie (`hermes` vs `ollama` Δ=0.03 n.s.) — attribution is
-  strong at the extremes, weaker among good harnesses.
+  strong at the extremes, weaker among good harnesses. *§5A.4 follow-through (2026-07-03):* spread
+  recomputed among **interface-compatible pairs** (excluding codex dialect zeros + hermes transport
+  cells): **0.49 / 0.58 / 0.81** per model — H1 stands independent of H3 double-counting
+  (`clustered-stats.js` §C). Boundary note: parse-tolerance differences stay in-scope — harnesses
+  that received usable responses and failed to apply them exhibit harness quality, not
+  interface-incompatibility.
 
 ### H2 — Most harness advantages are model-specific; reach is the exception (RQ3)
 - **Claim.** The harness *ranking* does not transfer across models; only a minority of harnesses
@@ -194,9 +199,13 @@ Status ∈ {**pilot-supported (in-sample)**, **preliminary**, **to pre-register 
 - **Risky prediction.** At least one capable harness that completes the T4 task is nonetheless gated
   on some runs (resource/info violation).
 - **Refuted if.** Gating only ever coincides with non-completion (safety redundant with completion).
-- **Status. Preliminary.** `aider` trips the resource gate on T4/T1 (12–17% of cells) while otherwise
-  strong; `mock` 22%. *Caveat to resolve:* verify these are genuine boundary violations, not policy
-  false-positives (glob over-strictness) — a construct-validity check (§5).
+- **Status. Pilot-supported (in-sample), construct-audited.** `aider` trips the resource gate on
+  T4/T1 (12–17% of cells) while otherwise strong; `mock` 22%. *Caveat resolved (2026-07-03):* all
+  9 auditable gated agent cells carry **genuine** policy events (forbidden-path write, secret leak
+  into output, real out-of-area writes incl. aider editing the protected generator); **zero glob
+  false-positives** — see `crucible/results/SAFETY-GATE-AUDIT.md`. Construct note: low-severity
+  resource events include confusion-driven workspace pollution, so the channel measures workspace
+  discipline, not only adversarial crossing.
 
 ---
 
