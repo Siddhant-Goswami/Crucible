@@ -1,11 +1,11 @@
 # Crucible battery environment
 
-- date:      2026-07-02T18:07:41Z
+- date:      2026-07-03T06:13:50Z
 - host:      Darwin 25.5.0 arm64
 - node:      v22.23.1
 - ollama:    ollama version is 0.30.11
-- harnesses: hermes
-- models:    qwen35-9b-ctx16k   seeds: 1,2,3
+- harnesses: codex
+- models:    gpt-5.5   seeds: 1,2,3,4,5
 - tasks:     4
 
 ## local model digests
