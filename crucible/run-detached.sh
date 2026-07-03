@@ -52,6 +52,8 @@ emit_plist() {
     <key>TASKS</key><string>${TASKS:-}</string>
     <key>LEDGER</key><string>${LEDGER:-}</string>
     <key>CRZ_THINK</key><string>${CRZ_THINK:-}</string>
+    <key>ORDER_SEED</key><string>${ORDER_SEED:-}</string>
+    <key>CANARY_MIN</key><string>${CANARY_MIN:-}</string>
   </dict>
 </dict>
 </plist>
