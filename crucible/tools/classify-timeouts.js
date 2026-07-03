@@ -29,6 +29,7 @@ const LEDGER = args.find(a => !a.startsWith('--') && a !== SERVER_LOG) ||
 
 const IDLE_TAIL_S = 60;          // silence this long before the kill => the harness was hung
 const NEAR_KILL_GRACE_S = 45;    // watchdog poll + teardown slack around the nominal kill time
+const CANARY_MIN = 5;            // tok/s below this at cell start => host was degraded (§5A.1)
 
 function sanitize(model) { return model.replace(/[^A-Za-z0-9]/g, '_'); }
 
@@ -36,6 +37,23 @@ function sanitize(model) { return model.replace(/[^A-Za-z0-9]/g, '_'); }
 const stubs = fs.readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean).map(JSON.parse)
   .filter(r => r.timed_out);
 if (!stubs.length) { console.log('no timed_out rows in ' + LEDGER); process.exit(0); }
+
+// ---- 1b. canary sidecar (written by matrix.sh per cell, §5A.1) -------------------------------
+// If the battery recorded host health at each cell's start, a cut-off cell whose canary was
+// already below CANARY_MIN tok/s (or whose probe failed even after the unload retry) is
+// HOST_DEGRADED — the host, not the pair, owns that timeout.
+const canaryByCell = {};
+const sidecarPath = LEDGER.replace(/\.jsonl$/, '.canary.jsonl');
+if (fs.existsSync(sidecarPath)) {
+  for (const line of fs.readFileSync(sidecarPath, 'utf8').split('\n').filter(Boolean)) {
+    try { const c = JSON.parse(line); if (c.cell) canaryByCell[c.cell] = c; } catch {}
+  }
+}
+const canaryUnhealthy = c => {
+  if (!c) return false;
+  const effective = c.action === 'unload_reprobe' ? c.tok_s_after : c.tok_s;
+  return effective == null || effective < CANARY_MIN;
+};
 
 // ---- 2. server log: reconstruct request windows [start, end] -------------------------------
 // GIN line: [GIN] 2026/06/30 - 13:30:19 | 200 | 34.195636875s | 127.0.0.1 | POST "/v1/chat/completions"
@@ -140,6 +158,14 @@ for (const s of stubs) {
   } else if (nEvents === 0 && cellReqs.length === 0) row.verdict = 'HUNG_NEVER_CALLED';
   else if (idleTail >= IDLE_TAIL_S) row.verdict = 'HUNG';
   else row.verdict = 'AMBIGUOUS_NEAR_KILL';
+
+  // §5A.1: a cut-off cell that STARTED on a degraded host is the host's timeout, not the pair's.
+  // (Sidecar cell keys use the raw model name; ledger stubs carry the same raw name.)
+  const can = canaryByCell[`${s.task}.${s.adapter}.${s.model}.s${s.seed}`];
+  if (row.verdict.startsWith('CUT_OFF') && canaryUnhealthy(can)) {
+    row.verdict = 'HOST_DEGRADED';
+    row.canary_tok_s = can.action === 'unload_reprobe' ? can.tok_s_after : can.tok_s;
+  }
   rows.push(row);
 }
 
@@ -170,8 +196,10 @@ for (const [v, n] of Object.entries(total).sort((a, b) => b[1] - a[1]))
 const hung = (total.HUNG || 0) + (total.HUNG_NEVER_CALLED || 0);
 const over = total.CUT_OFF_TOKEN_OVERBUDGET || 0;
 const within = total.CUT_OFF_WITHIN_BUDGET || 0;
+const degraded = total.HOST_DEGRADED || 0;
 console.log(`\nH4 read: ${hung} hangs (harness failure on any host) · ` +
   `${over} cut off already over token budget (harness overconsumption, host-independent) · ` +
-  `${within} cut off within token budget (wall-clock/latency, HOST-CONDITIONAL). ` +
+  `${within} cut off within token budget (wall-clock/latency, HOST-CONDITIONAL) · ` +
+  `${degraded} on a degraded host (canary below ${CANARY_MIN} tok/s — the HOST owns these). ` +
   `\nGoodput remains the right delivery metric, but "reliability is a harness property" must be ` +
-  `re-attributed: only the first two classes travel across hardware.`);
+  `re-attributed: only hangs and token-overbudget travel across hardware.`);
