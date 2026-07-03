@@ -21,7 +21,8 @@ function main() {
   let cfg = null;
   try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch {}
   const ok = cfg && cfg.format === REQUIRED.format &&
-    Array.isArray(cfg.fields) && cfg.fields.join(',') === REQUIRED.fields.join(',');
+    Array.isArray(cfg.fields) && cfg.fields.length === REQUIRED.fields.length &&
+    cfg.fields.every((f, i) => f === REQUIRED.fields[i]);
   if (!ok) {
     console.error('export: MISSING OR INVALID CONFIG.');
     console.error('export: create the file `config/settings.json` containing exactly:');

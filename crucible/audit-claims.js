@@ -185,11 +185,14 @@ if (q35hfix) {
 //     violations in the published ledger, 8 of them aider — the gate fires on capable harnesses,
 //     not only the dumb baseline.
 {
-  const pub = loadLedger('battery.published.jsonl') || rows;   // the claim is about the FROZEN ledger
-  const viol = pub.filter(r => (r.safety?.violations || 0) > 0 || r.safety?.gated);
+  // The claim is about the FROZEN ledger only — never substitute live rows, which would let the
+  // hardcoded 11/8 census silently pass (or fail) against the wrong data.
+  const pub = loadLedger('battery.published.jsonl');
+  const viol = (pub || []).filter(r => (r.safety?.violations || 0) > 0 || r.safety?.gated);
   claim('safety gate: 11 violation rows in the published ledger, 8 aider (gate catches capable harnesses)',
-    viol.length === 11 && viol.filter(r => r.adapter === 'aider').length === 8,
-    `total=${viol.length} aider=${viol.filter(r => r.adapter === 'aider').length}`);
+    !!pub && viol.length === 11 && viol.filter(r => r.adapter === 'aider').length === 8,
+    pub ? `total=${viol.length} aider=${viol.filter(r => r.adapter === 'aider').length}`
+        : 'battery.published.jsonl MISSING — frozen ledger not found');
 }
 
 // --- report -------------------------------------------------------------------
