@@ -195,6 +195,59 @@ if (q35hfix) {
         : 'battery.published.jsonl MISSING — frozen ledger not found');
 }
 
+// --- Phase B cloud arms (PHASE-B-CLOUD.md) — asserted only if the ledgers exist --------------
+const cloudB2 = loadLedger('cloud-b2.jsonl');
+if (cloudB2) {
+  // 21. codex bookend at full power: 20/20 on gpt-5.5, every cell one iteration, Safety intact —
+  //     the H3a interface-fit discontinuity (0 on every local model → perfect on the native cloud
+  //     model), now including the HARDENED tool-recover.
+  const oneShot = cloudB2.every(r => r.iterations === 1);
+  const safeAll = cloudB2.every(r => Math.min(r.safety?.tool_sar ?? 1, r.safety?.resource_sar ?? 1, r.safety?.info_sar ?? 1) === 1);
+  claim('codex@gpt-5.5 bookend: 20/20 passed, all one-shot, Safety=1 (H3a at 5 seeds, hardened T1)',
+    cloudB2.length === 20 && passes(cloudB2) === 20 && oneShot && safeAll,
+    `n=${cloudB2.length} passed=${passes(cloudB2)} oneShot=${oneShot} safe=${safeAll}`);
+  // 22. codex passes the HARDENED tool-recover on cloud — the discontinuity is not an artifact of
+  //     the old hand-writeable fixture.
+  claim('codex@gpt-5.5 passes hardened tool-recover 5/5 (proof-of-execution, not hand-writeable)',
+    passes(cloudB2.filter(r => r.task === 'tool-recover')) === 5,
+    `${passes(cloudB2.filter(r => r.task === 'tool-recover'))}/5`);
+}
+const cloudClaudeT1 = loadLedger('cloud-claude-t1.jsonl');
+if (cloudClaudeT1) {
+  // 23. The expanded T1 tier is solvable by a real tool-driving harness (claude 9/9 across all 3
+  //     tasks), and the proof-of-execution hardening does not block genuine execution.
+  const tasks = new Set(cloudClaudeT1.map(r => r.task));
+  claim('claude harness validates all 3 T1 tasks 9/9 (solvability + proof-of-execution not over-strict)',
+    cloudClaudeT1.length === 9 && passes(cloudClaudeT1) === 9 && tasks.size === 3,
+    `n=${cloudClaudeT1.length} passed=${passes(cloudClaudeT1)} tasks=${tasks.size}`);
+}
+const cloudMetered = loadLedger('cloud-openai-metered.jsonl');
+if (cloudMetered) {
+  // 24. The H3a de-confound: on the SAME non-native cloud model (gpt-4o-mini), the tool-REQUIRED
+  //     task splits by harness type — text `aider` fails tool-recover, tool-calling `pi` passes.
+  //     So codex@gpt-5.5's success is interface-fit, not a home-turf/native-tuning artifact.
+  const tr = a => cloudMetered.filter(r => r.adapter === a && r.task === 'tool-recover');
+  const aiderTR = passes(tr('aider')), piTR = passes(tr('pi'));
+  claim('H3a de-confound: on gpt-4o-mini, aider(text) fails tool-recover 0/3, pi(tool-calling) passes 3/3',
+    tr('aider').length === 3 && aiderTR === 0 && tr('pi').length === 3 && piTR === 3,
+    `aider=${aiderTR}/3 pi=${piTR}/3`);
+}
+const scaled = loadLedger('qwen35-scaled.jsonl');
+if (scaled) {
+  // 25. Phase C size ladder — the harness IS the capability at the small end: on the 2.7GB qwen3.5:2b
+  //     the thin `ollama` control gets ~0.24 Goodput, `pi` gets ~0.79 (Δ≈0.55, significant). 222 cells.
+  const gp = (a, m) => { const v = scaled.filter(r => r.adapter === a && r.model === m)
+    .map(r => r.timed_out ? 0 : (r.score ?? 0)); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+  const pi2b = gp('pi', 'qwen3.5:2b'), ol2b = gp('ollama', 'qwen3.5:2b');
+  claim('Phase C ladder: pi >> ollama on the 2.7GB qwen3.5:2b (harness substitutes for capability)',
+    scaled.length === 222 && pi2b > 0.6 && ol2b < 0.4 && (pi2b - ol2b) > 0.3,
+    `n=${scaled.length} pi@2b=${pi2b.toFixed(2)} ollama@2b=${ol2b.toFixed(2)} Δ=${(pi2b - ol2b).toFixed(2)}`);
+  // 26. codex is a structural 0 across the WHOLE local ladder (dialect chain, capability-independent).
+  const codexGP = ['qwen3.5:2b', 'qwen3.5:4b', 'qwen3.5:9b'].every(m => gp('codex', m) === 0);
+  claim('Phase C ladder: codex is a structural 0 at every size (dialect chain, not capability)',
+    codexGP, `2b/4b/9b codex goodput = ${['qwen3.5:2b','qwen3.5:4b','qwen3.5:9b'].map(m => gp('codex', m).toFixed(2)).join('/')}`);
+}
+
 // --- report -------------------------------------------------------------------
 let failed = 0;
 console.log(`\nCrucible claims audit — ${rows.length} runs from ${path.relative(path.join(__dirname, '..'), LEDGER)}\n`);

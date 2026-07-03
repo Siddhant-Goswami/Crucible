@@ -45,10 +45,20 @@ function parseTokens(buf) {
   const tryObj = s => { try { return JSON.parse(s); } catch { return null; } };
   const fromObj = o => {
     if (!o) return null;
+    // /v1/responses streams SSE; the terminal `response.completed` event nests usage under
+    // `.response.usage`. Unwrap it so streamed codex/Responses traffic is metered too.
+    if (o.usage == null && o.response && o.response.usage) o = { model: o.response.model, usage: o.response.usage };
     if (o.eval_count != null || o.prompt_eval_count != null)              // Ollama native
       return { model: o.model || null, in: o.prompt_eval_count || 0, out: o.eval_count || 0 };
-    if (o.usage)                                                          // OpenAI-compatible
-      return { model: o.model || null, in: o.usage.prompt_tokens || 0, out: o.usage.completion_tokens || 0 };
+    if (o.usage) {                                                        // OpenAI-compatible
+      const u = o.usage;
+      // /v1/chat/completions & /v1/completions use prompt_tokens/completion_tokens; /v1/responses
+      // (Codex's wire API) uses input_tokens/output_tokens. Accept both so codex — long an
+      // unmetered blind spot — is metered when pointed at the proxy via a custom Responses provider.
+      const tin = u.prompt_tokens ?? u.input_tokens ?? 0;
+      const tout = u.completion_tokens ?? u.output_tokens ?? 0;
+      return { model: o.model || null, in: tin, out: tout };
+    }
     return null;
   };
   const whole = fromObj(tryObj(text));
@@ -81,6 +91,16 @@ const server = http.createServer((creq, cres) => {
   // gzip/deflate response would be parsed as raw UTF-8 and yield no token counts.
   const headers = { ...creq.headers, host: UPSTREAM.host };
   delete headers['accept-encoding'];
+  // OVERRIDE the auth header when forwarding to OpenAI. Harnesses that reach a cloud model through
+  // their local "ollama" provider carry no real key — pi even sends a literal `Bearer ollama`
+  // placeholder — so their requests 401 at OpenAI and read 0 tokens. The proxy holds the real key
+  // (inherited from the run env) and replaces whatever placeholder they sent, so every OpenAI-
+  // dialect harness is metered uniformly. Scoped to the openai.com upstream so a local-Ollama run
+  // never receives a stray Authorization header.
+  if (/(^|\.)openai\.com$/.test(UPSTREAM.hostname) && process.env.OPENAI_API_KEY) {
+    delete headers.Authorization;
+    headers.authorization = 'Bearer ' + process.env.OPENAI_API_KEY;
+  }
   const opts = {
     protocol: UPSTREAM.protocol,
     hostname: UPSTREAM.hostname,
@@ -139,10 +159,14 @@ const server = http.createServer((creq, cres) => {
   creq.pipe(ureq);
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  const port = server.address().port;
-  if (PORTFILE) { try { fs.writeFileSync(PORTFILE + '.tmp', String(port)); fs.renameSync(PORTFILE + '.tmp', PORTFILE); } catch {} }
-  process.stderr.write('crucible-proxy listening :' + port + ' -> ' + UPSTREAM.origin + '\n');
-});
+// Only bind the port when run as a CLI; `require()` (unit tests) gets the pure helpers instead.
+if (require.main === module) {
+  server.listen(PORT, '127.0.0.1', () => {
+    const port = server.address().port;
+    if (PORTFILE) { try { fs.writeFileSync(PORTFILE + '.tmp', String(port)); fs.renameSync(PORTFILE + '.tmp', PORTFILE); } catch {} }
+    process.stderr.write('crucible-proxy listening :' + port + ' -> ' + UPSTREAM.origin + '\n');
+  });
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { try { server.close(); } catch {} process.exit(0); });
+}
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { try { server.close(); } catch {} process.exit(0); });
+module.exports = { parseTokens };
