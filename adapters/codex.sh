@@ -38,9 +38,25 @@ Rules: edit/create only the SOURCE or artifact files the task asks for. NEVER ed
 # the §6.4 test on the harness's home turf: on local models Codex is a structural 0 (they can't
 # emit its tool-call protocol); on a capable cloud model that can, it should actually work.
 if [[ "$MODEL" == *:* ]]; then
-  codex exec --oss --local-provider ollama -m "$MODEL" \
-    --sandbox workspace-write --skip-git-repo-check --ephemeral -C "$WORK" \
-    "$PROMPT" >/dev/null 2>&1 || true
+  if [ -n "${CODEX_PROXY_RESPONSES:-}" ] && [ -n "${OLLAMA_HOST:-}" ]; then
+    # METERED local path (opt-in): route Codex through the Crucible proxy via a CUSTOM Responses
+    # provider ($OLLAMA_HOST/v1 → proxy → Ollama /v1/responses). Codex's built-in `ollama` provider
+    # can't be repointed (the long-standing blind spot); a custom provider can, and the proxy now
+    # meters the /v1/responses usage shape (input_tokens/output_tokens). NOTE: this changes Codex's
+    # wire API from harmony-`--oss` to Responses, so it is NOT the config the frozen dialect-chain
+    # cells used — keep it opt-in so default results stay reproducible.
+    codex exec \
+      -c 'model_providers.cruproxy.name="cruproxy"' \
+      -c "model_providers.cruproxy.base_url=\"${OLLAMA_HOST%/}/v1\"" \
+      -c 'model_providers.cruproxy.wire_api="responses"' \
+      -c 'model_provider="cruproxy"' -m "$MODEL" \
+      --sandbox workspace-write --skip-git-repo-check --ephemeral -C "$WORK" \
+      "$PROMPT" >/dev/null 2>&1 || true
+  else
+    codex exec --oss --local-provider ollama -m "$MODEL" \
+      --sandbox workspace-write --skip-git-repo-check --ephemeral -C "$WORK" \
+      "$PROMPT" >/dev/null 2>&1 || true
+  fi
 else
   # Cloud (ChatGPT-account auth): named models are rejected on a ChatGPT plan, so DON'T pass -m —
   # use the account default. Disable MCP servers to avoid OAuth noise. Uses the subscription, not a
