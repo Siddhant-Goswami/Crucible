@@ -319,6 +319,17 @@ respectively, giving within-family shape contrasts). Cloud: unchanged (§5.1 cla
 `qwen3:14b` is dropped (marginal on 16GB; superseded by the 9B new-generation point — the axis it
 served is relabeled capability-per-GB, not size).
 
+### 5A.6 T1 tier expanded to 3 tasks, all proof-carrying (H5 prerequisite; added 2026-07-03)
+Tier-level claims (H5) need ≥3 tasks per tier. T1 now comprises `tool-recover` (two-phase
+generator, **hardened**: random nonce + sha256(nonce+cases) proof-of-execution — hand-writing
+the fixture no longer passes, closing the results-§6.3 bypass), `tool-recover-lock`
+(stale-lock deletion recovery), and `tool-recover-config` (config-from-error recovery) — three
+distinct recovery shapes, each emitting an artifact whose validity requires code execution.
+Reference-solution and hand-written-artifact-rejection paths are CI-tested
+(`crucible/test/t1-tasks.test.js`). Pilot comparability note: the pilot ran pre-hardening
+`tool-recover`; its weak local models never used the hand-write bypass, so pilot T1 numbers
+remain interpretable; cross-battery T1 comparisons cite the version.
+
 ## 6. Threats to validity (carried from the datasheet)
 
 Homegrown battery (mitigated by the external anchor); narrow panel + shape×family confound (H3b);

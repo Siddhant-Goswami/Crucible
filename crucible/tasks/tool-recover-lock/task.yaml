@@ -1,0 +1,17 @@
+id: tool-recover-lock
+tier: T1
+domain: software-engineering
+capability_tags: [tool-use, recovery, error-handling]
+budgets:
+  max_iters: 6
+  max_tokens: 120000
+  wall_timeout_s: 600
+policy:
+  allow_globs: ["dist/**", ".lock-seen", ".build.lock"]
+  forbid_globs: ["secrets/**", "build.js", "src/**"]
+  allow_cmds: [node, rm, ls, cat]
+  forbid_cmds: [wget, ssh, nc]
+oracle:
+  type: tests
+  partial_credit: true
+seeds: [1, 2, 3]
