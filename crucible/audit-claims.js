@@ -232,6 +232,21 @@ if (cloudMetered) {
     tr('aider').length === 3 && aiderTR === 0 && tr('pi').length === 3 && piTR === 3,
     `aider=${aiderTR}/3 pi=${piTR}/3`);
 }
+const scaled = loadLedger('qwen35-scaled.jsonl');
+if (scaled) {
+  // 25. Phase C size ladder — the harness IS the capability at the small end: on the 2.7GB qwen3.5:2b
+  //     the thin `ollama` control gets ~0.24 Goodput, `pi` gets ~0.79 (Δ≈0.55, significant). 222 cells.
+  const gp = (a, m) => { const v = scaled.filter(r => r.adapter === a && r.model === m)
+    .map(r => r.timed_out ? 0 : (r.score ?? 0)); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+  const pi2b = gp('pi', 'qwen3.5:2b'), ol2b = gp('ollama', 'qwen3.5:2b');
+  claim('Phase C ladder: pi >> ollama on the 2.7GB qwen3.5:2b (harness substitutes for capability)',
+    scaled.length === 222 && pi2b > 0.6 && ol2b < 0.4 && (pi2b - ol2b) > 0.3,
+    `n=${scaled.length} pi@2b=${pi2b.toFixed(2)} ollama@2b=${ol2b.toFixed(2)} Δ=${(pi2b - ol2b).toFixed(2)}`);
+  // 26. codex is a structural 0 across the WHOLE local ladder (dialect chain, capability-independent).
+  const codexGP = ['qwen3.5:2b', 'qwen3.5:4b', 'qwen3.5:9b'].every(m => gp('codex', m) === 0);
+  claim('Phase C ladder: codex is a structural 0 at every size (dialect chain, not capability)',
+    codexGP, `2b/4b/9b codex goodput = ${['qwen3.5:2b','qwen3.5:4b','qwen3.5:9b'].map(m => gp('codex', m).toFixed(2)).join('/')}`);
+}
 
 // --- report -------------------------------------------------------------------
 let failed = 0;

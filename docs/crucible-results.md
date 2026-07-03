@@ -372,6 +372,34 @@ Four results:
   off-target artifacts (`TODO.md`, stray scripts) and stalls — a genuine (harness × model)
   interaction failure. Neither is model capability; only the trace tells them apart.
 
+### 6.7 The qwen3.5 size ladder — capability-per-GB, and "the harness is the capability" (Phase C)
+A 222-run scaled battery (`PHASE-C-SIZE-LADDER.md`) sweeps the **qwen3.5 ladder** {2b, 4b, 9b}
+think-OFF × {pi, ollama, aider, codex} × 6 tasks × 3 seeds, under the full hardening (per-model
+timeout fits + seeded cell-shuffle + health canary). Goodput by harness × model:
+
+| harness | 2b (2.7GB) | 4b (3.4GB) | 9b (6.6GB) | mean |
+|---|--:|--:|--:|--:|
+| **pi** | **0.79** | 0.60 | **0.92** | **0.77** |
+| ollama (thin control) | 0.24 | 0.55 | 0.64 | 0.48 |
+| aider | 0.30 | 0.32 | 0.41 | 0.34 |
+| codex | 0.00 | 0.00 | 0.00 | 0.00 |
+
+- **The harness substitutes for capability where capability is scarcest.** On the 2.7GB `2b` model
+  — which fails 8/9 plain T0 tasks alone (calibration 1/9) — the thin `ollama` control scores
+  **0.24** but `pi` scores **0.79**, Δ=**0.55 [0.18, 0.87]** (task-clustered bootstrap, significant).
+  `pi`'s 2b (0.79) even beats `ollama`'s 9b (0.64): the right harness buys more than a 2.4× model-size
+  jump.
+- **The thin control rides raw capability** (`ollama` 0.24→0.55→0.64, monotonic); `codex` is a
+  **structural 0 across the whole ladder** (dialect chain, capability-independent).
+- **Reach across sizes is partial** (rank-stability τ=0.78): `pi` tops and `codex` floors every size,
+  but `aider`↔`ollama` swap between 2b and 4b — advantage isn't fully size-transferable even within
+  one family. And capability-per-GB is **non-monotonic** for `pi` (4b 0.60 < 2b 0.79: the qwen3.5:4b
+  checkpoint has task-specific holes) — routing picks the pair per task, not the biggest model.
+- **Methods:** all 22 timeouts classify as harness **hangs, 0 HOST_DEGRADED** (canary sidecar) — vs
+  93% host-thrash in the first three-arm battery. The per-model fits + shuffle + canary did their
+  job; these timeouts are harness-attributable. The pristine-source integrity guard also fired
+  **twice in production**, catching sandbox escapes before they could corrupt later cells.
+
 ## 7. Reproduce
 
 ```bash
