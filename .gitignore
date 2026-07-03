@@ -45,3 +45,4 @@ crucible/results/*.canary.jsonl
 !crucible/results/cloud-b2.jsonl
 !crucible/results/cloud-claude-t1.jsonl
 !crucible/results/cloud-openai-metered.jsonl
+!crucible/results/qwen35-t0-calib.jsonl

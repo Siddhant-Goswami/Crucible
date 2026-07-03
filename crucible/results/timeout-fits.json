@@ -4,6 +4,9 @@
   "fits": {
     "deepseek-r1:1.5b": 300,
     "deepseek-r1:8b": 390,
+    "qwen3.5:2b": 60,
+    "qwen3.5:4b": 30,
+    "qwen3.5:9b": 60,
     "qwen3:8b": 360
   }
 }

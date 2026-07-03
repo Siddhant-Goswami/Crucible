@@ -283,8 +283,13 @@ failure), 0 mid-run hangs, 0 token-overbudget. Accordingly:
   budget as the host-independent primary cap. Wall-clock Goodput is labeled host-conditional.
   *Frozen (2026-07-03, `fit-timeouts.js` → `timeout-fits.json`, applied by `matrix.sh` as a
   model-conditioned FLOOR — `effective_wt = max(task wt, fit)`):* `deepseek-r1:1.5b` 300s ·
-  `qwen3:8b` 360s · `deepseek-r1:8b` 390s. Models without T0 ledger data (all qwen3.5 variants)
-  are **UNFIT** and must run a T0 calibration slice before entering the scaled battery.
+  `qwen3:8b` 360s · `deepseek-r1:8b` 390s. **qwen3.5 ladder calibrated (Phase C, `qwen35-t0-calib.jsonl`,
+  think-off):** `qwen3.5:2b` 60s · `qwen3.5:4b` 30s · `qwen3.5:9b` 60s — these are fast, so their
+  fits sit below every task wall-timeout and the task budget governs (correct: fast models need no
+  extension). Calibration also surfaced a capability-per-GB result: **`qwen3.5:2b` passes only 1/9
+  T0 tasks** (sub-floor even on the easiest tier; ~120–160s flailing to max-iters on roman-numerals),
+  while 4b/9b pass 9/9 — the ladder's bottom rung is below the floor before the scaled battery even
+  begins. All qwen3.5 variants are now FIT.
 
 ### 5A.2 H3b re-mechanized: inline-vs-out-of-band reasoning, de-confounded on qwen3.5
 Live probes: `qwen3.5:9b` (and `qwen3:8b` on the same stack) return reasoning in a **separate
