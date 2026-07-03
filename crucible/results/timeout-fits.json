@@ -1,0 +1,9 @@
+{
+  "k": 5,
+  "rule": "effective_wt = max(task_wall_timeout_s, fit_s)",
+  "fits": {
+    "deepseek-r1:1.5b": 300,
+    "deepseek-r1:8b": 390,
+    "qwen3:8b": 360
+  }
+}

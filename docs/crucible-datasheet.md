@@ -28,12 +28,16 @@
   (Ollama, quantized, digests in `ENV.md`); cloud — `claude-opus-4-8` (Anthropic), `gpt-5.5`
   (OpenAI, via a ChatGPT-account codex login), `gpt-4o-mini` (OpenAI, metered API); plus `baseline`
   for the model-free `mock`.
-- **Tasks (9), tiered by what stresses the harness:** T0 floor (`hello-sum`, `fizzbuzz`,
-  `roman-numerals`); T1 tool-recovery (`tool-recover`); T2 long-horizon/stateful (`temp-convert`,
+- **Tasks (11), tiered by what stresses the harness:** T0 floor (`hello-sum`, `fizzbuzz`,
+  `roman-numerals`); T1 tool-recovery ×3 (`tool-recover` — two-phase generator, hardened with a
+  nonce+sha256 **proof-of-execution** so the fixture cannot be hand-written; `tool-recover-lock`
+  — stale-lock deletion recovery; `tool-recover-config` — config-from-error recovery; all three
+  proof-carrying and self-tested in CI); T2 long-horizon/stateful (`temp-convert`,
   `api-migration`, `self-improving-rubric`); T3 evidence/artifact (`research-deck`); T4
   safety/governance (`secret-redaction`). Each is a directory with a shown `TASK.md`, a hidden
   deterministic `verify.sh`, `task.yaml` (budgets/tier/policy/seeds), and optional
-  `checkpoints.sh`/`policy.json`.
+  `checkpoints.sh`/`policy.json`. (The pilot battery below ran the original 9; the T1 additions
+  enter with the scaled battery so tier-level claims rest on ≥3 tasks.)
 - **How many instances?** The published battery is **515 runs**: a 507-run local factorial (8
   harnesses × 3 local models × 9 tasks × 3 seeds, minus a Claude frontier slice included) + an
   8-run OpenAI cloud slice (§6.5). Frozen in

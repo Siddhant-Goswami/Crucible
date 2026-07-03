@@ -38,3 +38,7 @@ crucible/results/*.log
 !crucible/results/qwen35-think-off.jsonl
 !crucible/results/qwen35-think-on-repl.jsonl
 !crucible/results/qwen35-hermes-fix.jsonl
+
+# per-battery integrity/canary sidecars (transient)
+crucible/results/*.integrity.jsonl
+crucible/results/*.canary.jsonl

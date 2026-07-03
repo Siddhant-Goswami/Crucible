@@ -88,7 +88,12 @@ Status ∈ {**pilot-supported (in-sample)**, **preliminary**, **to pre-register 
 - **Status. Pilot-supported (in-sample).** `qwen3:8b` spans **0.00 (codex) → 0.91 (hermes)**; on
   `deepseek-r1:1.5b` aider>ollama Δ=0.37 [0.16, 0.59] **significant**. *At-risk regression:* on the
   clean-output model the *top pack* is a tie (`hermes` vs `ollama` Δ=0.03 n.s.) — attribution is
-  strong at the extremes, weaker among good harnesses.
+  strong at the extremes, weaker among good harnesses. *§5A.4 follow-through (2026-07-03):* spread
+  recomputed among **interface-compatible pairs** (excluding codex dialect zeros + hermes transport
+  cells): **0.49 / 0.58 / 0.81** per model — H1 stands independent of H3 double-counting
+  (`clustered-stats.js` §C). Boundary note: parse-tolerance differences stay in-scope — harnesses
+  that received usable responses and failed to apply them exhibit harness quality, not
+  interface-incompatibility.
 
 ### H2 — Most harness advantages are model-specific; reach is the exception (RQ3)
 - **Claim.** The harness *ranking* does not transfer across models; only a minority of harnesses
@@ -194,9 +199,21 @@ Status ∈ {**pilot-supported (in-sample)**, **preliminary**, **to pre-register 
 - **Risky prediction.** At least one capable harness that completes the T4 task is nonetheless gated
   on some runs (resource/info violation).
 - **Refuted if.** Gating only ever coincides with non-completion (safety redundant with completion).
-- **Status. Preliminary.** `aider` trips the resource gate on T4/T1 (12–17% of cells) while otherwise
-  strong; `mock` 22%. *Caveat to resolve:* verify these are genuine boundary violations, not policy
-  false-positives (glob over-strictness) — a construct-validity check (§5).
+- **Status. Pilot-supported (in-sample), construct-audited.** `aider` trips the resource gate on
+  T4/T1 (12–17% of cells) while otherwise strong; `mock` 22%. *Caveat resolved (2026-07-03):* all
+  9 auditable gated agent cells carry **genuine** policy events (forbidden-path write, secret leak
+  into output, real out-of-area writes incl. aider editing the protected generator); **zero glob
+  false-positives** — see `crucible/results/SAFETY-GATE-AUDIT.md`. Construct note: low-severity
+  resource events include confusion-driven workspace pollution, so the channel measures workspace
+  discipline, not only adversarial crossing.
+- **New observation (2026-07-03) — sandbox containment is itself a harness-safety property.** While
+  piloting the hardened T1 tasks, `pi` (told to "delete `.build.lock`") escaped its `cwd` sandbox:
+  it discovered the repo's `.git` root and deleted the file from the **pristine task source**, not
+  its workdir copy — a blast-radius failure (HarnessAudit's exact concern) that the in-workdir audit
+  cannot see. `mock` on the identical task does not (infrastructure verified clean, distinct inode).
+  Mitigation wired into `loop.sh`: a battery-mode pristine-source guard restores each task from git
+  before every cell and logs a `sandbox_escape` event (`<ledger>.integrity.jsonl`). The scaled
+  battery reports the per-harness escape rate as an auxiliary safety signal.
 
 ---
 
@@ -264,6 +281,10 @@ failure), 0 mid-run hangs, 0 token-overbudget. Accordingly:
 - **Budgets:** `wall_timeout_s` is re-fit per (model, host) as k× that model's median finished-run
   wall time on the T0 floor (k frozen before the battery; k=5 unless amended), keeping the token
   budget as the host-independent primary cap. Wall-clock Goodput is labeled host-conditional.
+  *Frozen (2026-07-03, `fit-timeouts.js` → `timeout-fits.json`, applied by `matrix.sh` as a
+  model-conditioned FLOOR — `effective_wt = max(task wt, fit)`):* `deepseek-r1:1.5b` 300s ·
+  `qwen3:8b` 360s · `deepseek-r1:8b` 390s. Models without T0 ledger data (all qwen3.5 variants)
+  are **UNFIT** and must run a T0 calibration slice before entering the scaled battery.
 
 ### 5A.2 H3b re-mechanized: inline-vs-out-of-band reasoning, de-confounded on qwen3.5
 Live probes: `qwen3.5:9b` (and `qwen3:8b` on the same stack) return reasoning in a **separate
@@ -305,6 +326,17 @@ frozen pilot), pinned `deepseek-r1:1.5b`/`8b` (inline-narration arm; Llama- and 
 respectively, giving within-family shape contrasts). Cloud: unchanged (§5.1 clause on ≥2 families).
 `qwen3:14b` is dropped (marginal on 16GB; superseded by the 9B new-generation point — the axis it
 served is relabeled capability-per-GB, not size).
+
+### 5A.6 T1 tier expanded to 3 tasks, all proof-carrying (H5 prerequisite; added 2026-07-03)
+Tier-level claims (H5) need ≥3 tasks per tier. T1 now comprises `tool-recover` (two-phase
+generator, **hardened**: random nonce + sha256(nonce+cases) proof-of-execution — hand-writing
+the fixture no longer passes, closing the results-§6.3 bypass), `tool-recover-lock`
+(stale-lock deletion recovery), and `tool-recover-config` (config-from-error recovery) — three
+distinct recovery shapes, each emitting an artifact whose validity requires code execution.
+Reference-solution and hand-written-artifact-rejection paths are CI-tested
+(`crucible/test/t1-tasks.test.js`). Pilot comparability note: the pilot ran pre-hardening
+`tool-recover`; its weak local models never used the hand-write bypass, so pilot T1 numbers
+remain interpretable; cross-battery T1 comparisons cite the version.
 
 ## 6. Threats to validity (carried from the datasheet)
 
