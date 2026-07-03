@@ -78,32 +78,46 @@ error) and passes.
 ## 5. Headline results
 
 > From a **507-run** battery (8 harnesses × 3 local models × up to 9 tasks × 3 seeds, plus the
-> Claude frontier slice). **55 cells timed out** at their `wall_timeout_s` and are excluded from
-> scores, reported separately in the `TO` column. The full tables are in
-> [`crucible/results/SCORECARD.md`](../crucible/results/SCORECARD.md); the exact environment is in
-> [`crucible/results/ENV.md`](../crucible/results/ENV.md). The full grid ran to completion this
-> round — no coverage gaps.
+> Claude frontier slice). **55 cells timed out** at their `wall_timeout_s`. A hang is a *delivery
+> failure*, not a missing sample, so the headline number below is **Goodput** — the gated Score
+> averaged over *all* attempts with **each timeout counted as 0** — reported next to **Rel%**
+> (finish-rate). (The earlier draft excluded timeouts, which flattered exactly the harnesses that
+> hang; the *conditional* "score when it finishes" is still in the scorecard as `Score|fin`.) The
+> full tables are in [`crucible/results/SCORECARD.md`](../crucible/results/SCORECARD.md) — regenerated
+> from the committed [`battery.published.jsonl`](../crucible/results/battery.published.jsonl) and
+> guarded in CI by [`crucible/audit-claims.js`](../crucible/audit-claims.js), which fails the build if
+> any number in this writeup drifts from the ledger. Environment: [`ENV.md`](../crucible/results/ENV.md).
 
-### 5.1 Capacity scorecard (Score per `harness @ model`)
+### 5.1 Capacity scorecard (Goodput per `harness @ model`)
+
+**Goodput** = gated Score over all attempts, timeouts = 0. Cells that hung carry their **Rel%**
+(finish-rate); an absent Rel% means every attempt finished.
 
 | Harness | `deepseek-r1:1.5b` (1.5b, reasoning) | `qwen3:8b` (8b, clean) | `deepseek-r1:8b` (8b, reasoning) | `claude-opus-4-8` |
 |---|--:|--:|--:|--:|
 | claude | — | — | — | **1.00** (12 cells, $1.38/run) |
-| aider | **0.58** *(4 TO)* | 0.73 *(5 TO)* | **0.88** *(2 TO)* | — |
-| ollama (thin control) | 0.12 | 0.91 | 0.68 *(2 TO)* | — |
-| pi | 0.00 | **1.00** *(8 TO)* | 0.00 | — |
-| hermes | 0.00 | 0.91 | 0.00 | — |
-| goose | 0.00 *(3 TO)* | 0.99 *(18 TO)* | 0.00 *(3 TO)* | — |
-| codex | 0.00 | 0.00 *(4 TO)* | 0.00 | — |
+| aider | **0.49** *(85% rel)* | 0.59 *(81% rel)* | **0.81** *(93% rel)* | — |
+| ollama (thin control) | 0.12 | **0.88** *(96% rel)* | 0.63 *(93% rel)* | — |
+| pi | 0.00 | 0.70 *(70% rel)* | 0.00 | — |
+| hermes | 0.00 | **0.91** *(100% rel)* | 0.00 | — |
+| goose | 0.00 *(89% rel)* | 0.33 *(**33% rel**)* | 0.00 *(89% rel)* | — |
+| codex | 0.00 | 0.00 | 0.00 | — |
 | mock (floor) | 0.13, **Safety 0.97 (22% gated)** | — | — | — |
+
+**What counting timeouts as failures changes.** Under the old timeout-excluded score, `pi @ qwen3`
+read **1.00** and `goose @ qwen3` **0.99** — top of the field. But `goose` *finished only 9 of 27
+attempts* (33% Rel) and `pi` 19 of 27 (70%): as Goodput they fall to **0.33** and **0.70**. The
+honest `qwen3:8b` leaders are the *reliable* harnesses — **`hermes` (0.91) and `ollama` (0.88)** —
+not the flaky ones. Reliability isn't a footnote to the score; for routing it *is* the score.
 
 ### 5.2 The output *shape* reorders the field — and "Score 0" hides ≥3 different reasons (P2, P8)
 Read across the two reasoning models (`deepseek-r1:*`) against the clean-output one (`qwen3:8b`) and
 a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses `pi`, `hermes`, and
-`goose` collapse to **0**, yet on `qwen3:8b` they recover to ~0.9–1.0 — whereas `codex` is a
-structural zero on *every* local model (`qwen3:8b` included; see §5.4), so it never recovers. The
-only harnesses that survive the deepseek models are **`aider`** (0.58 / 0.88) and the thin **`ollama`**
-control (0.12 / 0.68).
+`goose` collapse to **0**, yet on `qwen3:8b` they partly recover — `hermes` cleanly (0.91, 100% rel)
+but `pi` and `goose` only *conditionally*: their finished-run scores are ~1.0 but Goodput is 0.70 /
+0.33 once their timeouts count (§5.1). `codex` is a structural zero on *every* local model
+(`qwen3:8b` included; see §5.4), so it never recovers. The harnesses that survive the deepseek models
+are **`aider`** (0.49 / 0.81) and the thin **`ollama`** control (0.12 / 0.63).
 
 We read the per-run traces instead of guessing at one cause — and the shared `0` is **not one
 failure, it is at least three distinct ones**, which is the more honest (and more useful) finding:
@@ -130,14 +144,16 @@ commit the edit anyway. Exactly why a score must name a `(harness, model)` pair,
 alone — and why a bare "Score 0" is a prompt to open the trace, not a conclusion.
 
 ### 5.3 `aider` has reach; the rest are model-specific (P4)
-Averaged across the local panel, **`aider` leads every non-Claude harness on transfer (mean 0.73)** —
-the only lean harness that clears every model, weak or strong, reasoning or clean. `ollama` follows
-(0.57); `pi`/`goose` (0.33), `hermes` (0.30), and `codex` (0.00) each win on at most one model and
-vanish on the rest. The report's rank-stability check fires: **⚠️ the ordering changes across models**
-— most harness advantages are *model-specific, not structural*. And `aider`'s edge is **statistically
-real**: it beats `ollama` by Δ=**0.478** [0.261, 0.685] on `deepseek-r1:1.5b` and Δ=**0.203**
-[0.056, 0.367] on `deepseek-r1:8b` (both **significant**, paired bootstrap). On `qwen3:8b` the top
-pack is a tie — `pi` vs `goose` Δ=0.015, **not significant**.
+Averaged across the local panel (mean Goodput), **`aider` leads every non-Claude harness on transfer
+(mean 0.63)** — the only lean harness that clears every model, weak or strong, reasoning or clean.
+`ollama` follows (0.54); `hermes` (0.30), `pi` (0.23), `goose` (0.11), and `codex` (0.00) each win on
+at most one model and vanish on the rest. The report's rank-stability check fires: **⚠️ the ordering
+changes across models** — most harness advantages are *model-specific, not structural*. And `aider`'s
+edge is **statistically real**: on Goodput it beats `ollama` by Δ=**0.37** [0.158, 0.58] on
+`deepseek-r1:1.5b` and Δ=**0.183** [0.012, 0.368] on `deepseek-r1:8b` (both **significant**, paired
+bootstrap). On `qwen3:8b` the top two are `hermes` vs `ollama` Δ=0.029 [-0.022, 0.112], **not
+significant** — a genuine tie between the two most *reliable* harnesses, not the timeout-inflated
+`pi`/`goose` tie the earlier draft reported.
 
 ### 5.4 `codex` is a structural zero, not a bad-model day (P1)
 `codex` scores **0 across all 77 finished cells** — every one an `artifact_commitment` failure. This
@@ -166,17 +182,50 @@ response at all. Same bucket, opposite mechanisms — the trace, not the label, 
 tool-recovery, state) instead of piling entirely into "produced nothing" — the signature of a harness
 that *engages* the task rather than bouncing off it. **Claude failed nothing (12/12).** Cost/latency
 is first-class:
-**55 cells timed out** — `goose` alone burned **18** on `qwen3:8b`, so its ~1.0 headline there is over
-just the 9 cells it finished; read it *with* the `TO` column. On token efficiency `ollama`@`qwen3:8b`
+**55 cells timed out** — `goose` alone burned **18** on `qwen3:8b`, finishing only 9 of 27; that is
+exactly why its Goodput there is **0.33**, not the 0.99 its finished cells alone would suggest (§5.1).
+On token efficiency `ollama`@`qwen3:8b`
 is most frugal (369 successes/Mtok), `aider` competitive (108–142), and Claude's quality is highest
 at a metered ~$1.4/run (a cache-inflated upper bound).
 
 ### 5.7 What still holds from v1
-- The **T1 tool-recover discrimination** is still confirmed empirically: the file-only `ollama`
-  control cannot run the generator and fails every cell; tool-capable harnesses (`aider`, `claude`)
-  pass.
+- **T1 tool-recover discriminates — but not the way an earlier draft claimed.** The file-only
+  `ollama` control cannot run the generator and fails every cell (as designed). But **`aider` also
+  fails it on every local model** — 0/9 passes, Goodput ~0.03 (see §2 of the scorecard) — so the
+  earlier line "tool-capable harnesses (`aider`, `claude`) pass" was wrong for `aider`. What actually
+  passes T1 *locally* is the **tool-calling** harnesses `pi`/`goose`/`hermes`, and only on the
+  clean-output `qwen3:8b`; the full **`claude`** harness passes it 3/3. The discrimination is real —
+  tool-recovery is a knife-edge only a tool-driving `(harness, model)` pair clears — it just doesn't
+  favor `aider`. (This exact claim is now pinned in `crucible/audit-claims.js`, so it can't silently
+  regress again.)
 - **Wide CIs / few seeds:** with 3 seeds many differences are *not* significant — reported honestly,
   not hidden. `smpl⚠` marks cells whose tight CI is an artifact of zero variance, not stability.
+
+### 5.8 Routing: when to use which (harness, model) — local vs cloud
+The scorecard now emits the decision this benchmark exists to serve
+([`SCORECARD.md`](../crucible/results/SCORECARD.md) §3 economics, §4 routing table). Two reads:
+
+- **Economics (§3).** Local marginal cost is $0 but you pay it in *latency*: `ollama@qwen3` finishes
+  a run in ~9s, the deepseek models in 50–150s+. Claude runs **$0.72–$1.70/run** here. So the routing
+  question is never "which is best" — it's *"does a local pair clear my quality bar at acceptable
+  latency, before I pay cloud $?"*
+- **The routing table (§4).** Per tier, the best local `(harness, model)` ties Claude's Goodput on
+  every tier we tested — so the verdict is **✅ stay local**, and the win is cost. But the winning
+  pair is *tier-specific* (`pi@qwen3` for T1 tool-recover, `aider@deepseek-r1:8b` for T2) — a
+  difficulty-router (RouteLLM, Hybrid-LLM) can't pick it from prompt length; it needs this table.
+
+The sharper, more actionable cut is **"your local model is fixed"** (it's whatever fits your GPU):
+
+| Local model | routing verdict |
+|---|---|
+| **qwen3:8b** | clears **every** tier locally — stay local, save $0.72–$1.70/run (pick the right harness per tier) |
+| **deepseek-r1:8b** | clears T0/T2/T3/T4; **escalate T1 tool-recover** (best-local 0.13) to cloud |
+| **deepseek-r1:1.5b** | escalate almost everything (only T2 borderline, 0.70) — too weak to harness around |
+
+The rule that falls out: **the harness choice matters most in the middle.** A mid model (`qwen3:8b`)
+can be *harnessed* to match cloud on every tier if you pick the right harness; a tiny model can't be
+harnessed into capability it lacks (escalate); and **tool-recovery (T1) is the one tier where even a
+solid 8B local model should hand off to cloud.** (These verdicts are pinned in `audit-claims.js`.)
 
 ## 6. Claude *as the model* behind the lean harnesses (a frontier slice)
 
@@ -228,6 +277,46 @@ Four findings, each a clean instance of a core principle:
   be pointed at the shim at all.) The same structural fault line as the reasoning-model result:
   *what shape the interface expects* decides whether a harness can use a given model.
 
+  **Update (Tier 1): this gap is now closable — with a real API key.** The timeout was a limitation of
+  the *OAuth* shim, not of the idea. `proxy/anthropic-shim.js` is an OpenAI/Ollama-compatible endpoint
+  backed by the **Anthropic Messages API** (`ANTHROPIC_API_KEY`, not the OAuth login) that **translates
+  tool-calls both ways** — OpenAI `tools`/`tool_calls` ↔ Anthropic `tools`/`tool_use`/`tool_result`. A
+  tool-calling harness pointed at it gets real structured tool-calls back, so `pi`/`hermes`/`goose` can
+  finally be measured on a cloud Claude model (metering flows through the normal proxy unchanged; the
+  translation is unit-tested in `crucible/test/anthropic-shim.test.js`). This closes the *mechanism*
+  gap for Anthropic; the actual cloud **data** we gathered used OpenAI instead — §6.5.
+
+### 6.5 The `codex` bookend — a structural 0 on local, works on a capable cloud model (P1/P2)
+The sharpest confirmation of the whole thesis. `codex` scored **0 across all 77 local cells** (§5.4)
+because the local models can't emit its structured tool-call protocol. Run the *same* `codex` harness
+on a capable cloud model — **gpt-5.5**, via its native OpenAI provider (Codex's home turf) — and it
+one-shots the discriminating tasks:
+
+| Harness @ model | tool-recover | api-migration | secret-redaction | temp-convert | pass^1/^2/^3 |
+|---|:--:|:--:|:--:|:--:|:--:|
+| `codex` @ *local* (all 3 models) | — | — | — | — | **0 / 0 / 0** (0/35) |
+| **`codex` @ gpt-5.5** (cloud, tool-calling) | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | **1 / 1 / 1** |
+| `aider` @ gpt-4o-mini (cloud, **metered**, text) | ✗ 0.01 | ✅ 1.0 | ✅ 1.0 | ✅ 1.0 | 0.75 / 0.5 / 0.25 |
+
+Three readings, each a core principle:
+- **The harness was never broken (P1/P2).** `codex` 0→1.0 on a model swap alone, harness held fixed,
+  is the cleanest possible "measure the pair, not the harness": its local 0 was a *model-interface*
+  failure, not a capability one. On gpt-5.5 it passes `tool-recover` (the tool-required task) in **one
+  iteration**, and holds `Safety=1` on the injection task.
+- **Tool-recovery needs BOTH a tool-driving harness AND a capable model.** `aider` (text diff-blocks,
+  not structured tools) on the mid `gpt-4o-mini` clears the ordinary tasks but **fails `tool-recover`**
+  (0.013, burning 30k tokens), exactly as it failed T1 on every local model (§5.7). Cloud alone
+  doesn't save a text harness on a tool-required task; `codex`+gpt-5.5 (tool-calling + strong model)
+  does. Its pass^k falls 0.75→0.25 precisely because of that one flaky tier.
+- **Metered cloud cost is real and tiny here (P7).** `aider@gpt-4o-mini` ran through the normal proxy
+  (`OPENAI_API_BASE` → proxy → OpenAI) at **~$0.0018/run** and **496 tok/s** — genuine metered API
+  spend, versus `codex@gpt-5.5` which ran on a **ChatGPT subscription** (`$0*` — unmetered, not free at
+  scale) and `claude` at $0.72–$1.70/run. All three now sit in the §3/§4 economics + routing tables.
+
+(We used **OpenAI** for this slice — `codex` on its native ChatGPT-account model, and `aider` on a
+metered `gpt-4o-mini` API key — rather than the Anthropic shim of §6.4; both are cloud demonstrations,
+and both findings are pinned in `audit-claims.js`.)
+
 ## 7. Reproduce
 
 ```bash
@@ -244,10 +333,28 @@ node crucible/report.js crucible/results/battery.jsonl
 # one instrumented run:
 CRUCIBLE=1 HARNESS_MODEL=qwen3:8b SEED=1 ./loop.sh crucible/tasks/tool-recover pi 6
 
-# §6 frontier slice — Claude as the MODEL behind a lean harness (uses the logged-in claude CLI):
+# §6 frontier slice — Claude as the MODEL behind a TEXT harness (uses the logged-in claude CLI, tools off):
 node crucible/proxy/claude-shim.js --portfile /tmp/shim.port &   # bridge: Ollama/OpenAI -> claude -p
 CRUCIBLE=1 HARNESS_MODEL=claude-opus-4-8 OLLAMA_UPSTREAM="http://127.0.0.1:$(cat /tmp/shim.port)" \
   ./loop.sh tasks/hello-sum ollama 4
+
+# §6.4 (Tier 1) — Claude behind a TOOL-CALLING harness, via the Anthropic Messages API (needs a KEY):
+export ANTHROPIC_API_KEY=sk-ant-...                              # a real API key, NOT the OAuth login
+node crucible/proxy/anthropic-shim.js --portfile /tmp/ashim.port &   # bridge: OpenAI/Ollama tools <-> Anthropic
+CRUCIBLE=1 HARNESS_MODEL=claude-opus-4-8 OLLAMA_UPSTREAM="http://127.0.0.1:$(cat /tmp/ashim.port)" \
+  ./loop.sh crucible/tasks/tool-recover pi 6                     # pi/hermes/goose now get real tool-calls
+
+# §6.5 — the OpenAI cloud slice we actually ran:
+CLOUD="crucible/tasks/tool-recover crucible/tasks/api-migration crucible/tasks/secret-redaction tasks/temp-convert"
+#  (a) codex on its NATIVE cloud model (ChatGPT-account login; a cloud model has no ":" so codex.sh
+#      switches off --oss). Subscription, so proxy tokens read 0 ($0*):
+TASKS="$CLOUD" ADAPTERS=codex MODELS=gpt-5.5 SEEDS=1 LEDGER=crucible/results/cloud-battery.jsonl \
+  bash crucible/matrix.sh
+#  (b) aider on a METERED OpenAI key (proxy -> OpenAI, real $ + tokens):
+export OPENAI_API_KEY=sk-...
+TASKS="$CLOUD" ADAPTERS=aider MODELS=gpt-4o-mini SEEDS=1 RESUME=1 \
+  OLLAMA_UPSTREAM=https://api.openai.com LEDGER=crucible/results/cloud-battery.jsonl \
+  bash crucible/matrix.sh
 ```
 
 The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-checked

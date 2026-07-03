@@ -94,8 +94,12 @@ declaring tier, budgets, policy, and seeds.
 - **Claude can be run as the MODEL behind a lean harness**, not just as its own harness, via
   `proxy/claude-shim.js` — an Ollama/OpenAI endpoint backed by the logged-in `claude -p` (tools off).
   Point `OLLAMA_UPSTREAM` at it and set `HARNESS_MODEL=claude-opus-4-8`. Only **text-format** harnesses
-  (`ollama`, `aider`) can drive it; tool-calling harnesses (`pi`/`hermes`/`goose`/`openclaw`) need
-  structured tool-calls a plain completion can't emit, so they time out (see `docs/crucible-results.md`
-  §6). Metering flows through the normal proxy; cost carries a ~22k-token/call Claude Code baseline.
+  (`ollama`, `aider`) can drive that shim; tool-calling harnesses (`pi`/`hermes`/`goose`) need
+  structured tool-calls a plain completion can't emit (see `docs/crucible-results.md` §6).
+- **Tool-calling harnesses on a cloud model** are now supported via `proxy/anthropic-shim.js` — an
+  OpenAI/Ollama endpoint backed by the **Anthropic Messages API** (`ANTHROPIC_API_KEY`, a real key,
+  not the OAuth login) that **translates tool-calls both ways** (OpenAI `tools`/`tool_calls` ↔
+  Anthropic `tool_use`/`tool_result`). Point `OLLAMA_UPSTREAM` at it and run `pi`/`hermes`/`goose`.
+  Metering flows through the normal proxy; the translation is unit-tested (`test/anthropic-shim.test.js`).
 - **Compute**: the full `harness × model × seed × task` grid is large; keep the default battery
   small and log any cap — never silently truncate.

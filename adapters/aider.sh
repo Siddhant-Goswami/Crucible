@@ -12,8 +12,16 @@ WORK="$1"; FEEDBACK="$3"
 MODEL="${HARNESS_MODEL:-qwen3:8b}"
 command -v aider >/dev/null 2>&1 || { echo "aider not installed (uv tool install aider-chat)" >&2; exit 1; }
 
-# route Ollama through the Crucible proxy (OpenAI/native) so tokens are metered
-export OLLAMA_API_BASE="${OLLAMA_HOST:-http://localhost:11434}"
+# Model axis: LOCAL model ("<name>:<size>") drives Ollama through the proxy; a cloud model (no ":",
+# e.g. gpt-4o-mini) drives the OpenAI API through the same proxy (OPENAI_API_BASE -> proxy ->
+# OLLAMA_UPSTREAM=https://api.openai.com), so cloud tokens are metered the same way. Needs OPENAI_API_KEY.
+if [[ "$MODEL" == *:* ]]; then
+  export OLLAMA_API_BASE="${OLLAMA_HOST:-http://localhost:11434}"
+  AIDER_MODEL="ollama_chat/$MODEL"
+else
+  export OPENAI_API_BASE="${OLLAMA_HOST:-https://api.openai.com}/v1"   # proxy forwards /v1 -> OpenAI, metered
+  AIDER_MODEL="openai/$MODEL"
+fi
 
 TASK="$(cat "$WORK/TASK.md" 2>/dev/null)"
 FB=""; [ -s "$FEEDBACK" ] && FB="The previous attempt FAILED the verifier. Feedback:
@@ -30,7 +38,7 @@ while IFS= read -r f; do FILES+=("$f"); done < <(find . -type f \
   -not -name '*.test.js' | sed 's|^\./||' | sort)
 
 aider ${FILES[@]+"${FILES[@]}"} \
-  --model "ollama_chat/$MODEL" \
+  --model "$AIDER_MODEL" \
   --no-git --no-auto-commits --yes-always --no-stream --no-pretty \
   --no-check-update --no-show-model-warnings \
   --message "Make this project's rules-based verifier (./verify.sh) pass.

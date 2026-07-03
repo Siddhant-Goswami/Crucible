@@ -25,13 +25,43 @@ function pairedBoot(aByKey, bByKey, B = 2000, rng = Math.random) {
   return { diff: mean(diffs), lo, hi, sig: lo > 0 || hi < 0, n: diffs.length };
 }
 
-// Marginal $ for a run given pricing.json: local models => $0; claude-* keyed directly,
-// other local models keyed as ollama/<model>.
+const median = a => {
+  if (!a.length) return 0;
+  const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+// pass^k (τ-bench): the probability that k independently-drawn attempts ALL pass — a reliability
+// metric, not a peak one. Unbiased estimator over c passes in n attempts (draws without
+// replacement): prod_{i=0}^{k-1} (c-i)/(n-i). pass^1 = success rate; pass^k falls fast if the
+// harness is flaky. Returns null when n < k (can't estimate). A timeout counts as a non-pass.
+function passK(c, n, k) {
+  if (n < k || n <= 0) return null;
+  let p = 1;
+  for (let i = 0; i < k; i++) p *= (c - i) / (n - i);
+  return Math.max(0, p);
+}
+
+// Marginal $ for a run given pricing.json. A LOCAL model is named "<name>:<size>" (has a colon,
+// e.g. qwen3:8b) → keyed as ollama/<model> ($0 marginal). A CLOUD model has no colon (claude-opus-4-8,
+// gpt-5.5, gpt-4o-mini) → keyed directly at its list price.
 function priceRun(r, pricing) {
   if (!r.model || r.model === 'baseline') return 0;            // floor / local-unknown => $0 (don't alias a real key)
-  const key = r.model.startsWith('claude') ? r.model : 'ollama/' + r.model;
+  const key = r.model.includes(':') ? 'ollama/' + r.model : r.model;
   const p = (pricing.models && pricing.models[key]) || { in: 0, out: 0 };
   return ((r.tokens_in || 0) * p.in + (r.tokens_out || 0) * p.out) / 1e6;
 }
 
-module.exports = { mean, bootCI, pairedBoot, priceRun };
+// Cloud-EQUIVALENT $ for a run: what it would cost to run this SAME model on a hosted endpoint —
+// the apples-to-apples number for local-vs-cloud routing (local marginal $ is 0 but hides the
+// hardware + latency you actually pay). claude-* price at their own rate; OSS local models price
+// at their OpenRouter-hosted rate (openrouter/<model> in pricing.json). Returns null if unpriced.
+function priceRunCloud(r, pricing) {
+  if (!r.model || r.model === 'baseline') return null;
+  const key = r.model.includes(':') ? 'openrouter/' + r.model : r.model;   // local -> hosted equiv; cloud -> itself
+  const p = pricing.models && pricing.models[key];
+  if (!p) return null;
+  return ((r.tokens_in || 0) * p.in + (r.tokens_out || 0) * p.out) / 1e6;
+}
+
+module.exports = { mean, median, passK, bootCI, pairedBoot, priceRun, priceRunCloud };
