@@ -1,4 +1,4 @@
-# hermes-control-panel
+# Crucible
 
 **Harness-first agent research on one substrate.** This repo does two things:
 
