@@ -1,0 +1,24 @@
+== (A) paired comparisons: task-clustered vs run-level bootstrap ==
+
+aider - ollama @ deepseek-r1:1.5b   (n=27 pairs, 9 task clusters)
+  published (run-level):    0.37 [0.158, 0.58] sig
+  run-level re-run:  Δ=0.370 [0.146, 0.583]  SIGNIFICANT
+  TASK-CLUSTERED:    Δ=0.370 [0.080, 0.658]  SIGNIFICANT
+
+aider - ollama @ deepseek-r1:8b   (n=27 pairs, 9 task clusters)
+  published (run-level):    0.183 [0.012, 0.368] sig
+  run-level re-run:  Δ=0.183 [0.019, 0.363]  SIGNIFICANT
+  TASK-CLUSTERED:    Δ=0.183 [0.040, 0.344]  SIGNIFICANT
+
+hermes - ollama @ qwen3:8b   (n=27 pairs, 9 task clusters)
+  published (run-level):    0.029 [-0.022, 0.112] n.s.
+  run-level re-run:  Δ=0.029 [-0.023, 0.113]  n.s.
+  TASK-CLUSTERED:    Δ=0.029 [-0.039, 0.127]  n.s.
+
+== (B) H2 rank-stability noise null ==
+
+harnesses: ollama, pi, hermes, goose, codex, aider
+observed mean pairwise Kendall τ across model columns: 0.407
+null (common ordering + seed noise): 5th pct 0.733, median 0.822
+one-sided p = P(τ_null <= τ_obs) = 0.0000
+=> rank instability EXCEEDS noise: H2's "ordering changes across models" is evidence.

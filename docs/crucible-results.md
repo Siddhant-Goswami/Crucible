@@ -110,6 +110,18 @@ attempts* (33% Rel) and `pi` 19 of 27 (70%): as Goodput they fall to **0.33** an
 honest `qwen3:8b` leaders are the *reliable* harnesses — **`hermes` (0.91) and `ollama` (0.88)** —
 not the flaky ones. Reliability isn't a footnote to the score; for routing it *is* the score.
 
+**What a timeout actually is (autopsy).** Counting timeouts as 0 is right for *delivery*, but the
+word "flaky" over-claims: a per-cell autopsy of all 55 timeouts
+([`TIMEOUT-AUTOPSY.md`](../crucible/results/TIMEOUT-AUTOPSY.md), tool
+[`classify-timeouts.js`](../crucible/tools/classify-timeouts.js)) shows **51 were still
+mid-generation at the kill, within token budget** (host-conditional wall-clock latency) and only
+**4 were true hangs** (all `codex`, which never completed a model call). Goodput stands as the
+delivery metric; the *attribution* is split per cell into hang / token-overbudget /
+wall-clock-within-budget, and only the first two travel across hardware. Relatedly, the pilot's
+significance claims survive a **task-clustered bootstrap** and the §5.3 rank-instability exceeds a
+seed-noise null (τ=0.407 vs null 5th-pct 0.733, p<0.0005) —
+[`clustered-stats.js`](../crucible/tools/clustered-stats.js).
+
 ### 5.2 The output *shape* reorders the field — and "Score 0" hides ≥3 different reasons (P2, P8)
 Read across the two reasoning models (`deepseek-r1:*`) against the clean-output one (`qwen3:8b`) and
 a sharp pattern falls out. On **both** deepseek-r1 models the richer harnesses `pi`, `hermes`, and
@@ -317,6 +329,38 @@ Three readings, each a core principle:
 metered `gpt-4o-mini` API key — rather than the Anthropic shim of §6.4; both are cloud demonstrations,
 and both findings are pinned in `audit-claims.js`.)
 
+### 6.6 The qwen3.5 three-arm study — dialect chains, thinking economics, host non-stationarity
+
+A pre-registered follow-up (hypotheses §5A; full trail in
+[`QWEN35-BOOKEND-NOTES.md`](../crucible/results/QWEN35-BOOKEND-NOTES.md); ledgers
+`qwen35-pilot` / `qwen35-think-off` / `qwen35-think-on-repl`, all claims pinned) put the lean
+harnesses on **`qwen3.5:9b`** — a local model that verifiably emits clean structured tool-calls.
+Four results:
+
+- **The codex zero is a *dialect-chain* failure, not protocol absence (H3a, sharpened).** codex
+  scores **0/12** on a local model that emits perfect OpenAI-style `tool_calls` — its `--oss` path
+  expects the gpt-oss harmony dialect, and its Responses-wire path drops its own tool grammar even
+  though the same endpoint works with plain function tools. Meanwhile **`pi` sweeps T1
+  tool-recover 3/3 in both think arms** — the first perfect local tool-recover sweep — so
+  interface-fit binds at the *weakest link of the harness's dialect chain*
+  (harness wire-API × serving translation × model template), demonstrated entirely locally.
+- **Reasoning-mode is a serving-layer variable with real economics.** With thinking at the
+  serving default (ON), 30/36 tool-caller cells blew the wall clock; with thinking pinned OFF
+  (proxy `CRZ_THINK`, recorded per row) timeouts fell to 3/36 and **`pi @ qwen3.5:9b` reached
+  Goodput 0.83 — the strongest local tool-calling pair in the program.**
+- **…but the timeout wall itself was mostly the *host*, not the thinking.** A think-ON
+  replication of the worst cells (api-migration × pi) on a healthy host passed **3/3 (Goodput
+  0.96), beating think-OFF** on the same task. Arm 1 had run the host 8.7GB into swap; wall-clock
+  Goodput on a constrained host is **non-stationary — cell order becomes a confound**. The scaled
+  battery therefore adds a per-cell host-health canary, randomized cell order, and a
+  HOST_DEGRADED autopsy class (§5A.1 of the hypotheses doc).
+- **Two more "same zero, different owner" cases.** `hermes` 0/24 is a *serving-context fault*
+  (Ollama loads qwen3.5 at num_ctx 4096; hermes' ~5k-token fixed prompt is truncated to 2050
+  before the model ever sees the task) — its ~20k-char system prompt makes it structurally
+  dependent on a large serving window. `goose`'s zeros are *engaged-but-misdirected*: it commits
+  off-target artifacts (`TODO.md`, stray scripts) and stalls — a genuine (harness × model)
+  interaction failure. Neither is model capability; only the trace tells them apart.
+
 ## 7. Reproduce
 
 ```bash
@@ -376,6 +420,10 @@ The core logic is unit-tested (`node --test crucible/test/*.test.js`) and CI-che
   discriminating probes.
 - **Timed-out cells are logged, not dropped** — a hung cell is killed at its `wall_timeout_s` and
   left absent so a resume retries it; the battery summary reports the count.
+- **Wall-clock Goodput is host-conditional AND host-history-conditional** — a long local battery
+  degrades the host (swap growth collapsed qwen3.5 throughput from 22 tok/s to a wedged runner in
+  §6.6), so late cells time out more. Until the scaled battery adds health canaries and randomized
+  cell order, read any wall-clock timeout with its autopsy class, never as harness flakiness alone.
 - **The §6 Claude slice is a plain-text completion, not agentic Claude Code** — the shim runs
   `claude -p` with tools OFF via the *logged-in session* (OAuth, no API key), so it measures the lean
   harness driving Claude *as a raw model*, not Claude Code's own tool-use. Its cost is the same

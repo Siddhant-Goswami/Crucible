@@ -8,6 +8,7 @@ const [task, adapter, model, seed] = process.argv.slice(2);
 process.stdout.write(JSON.stringify({
   task, adapter, model, seed: Number(seed),
   result: 'no-result', timed_out: true,
+  think: process.env.CRZ_THINK === 'true' ? true : process.env.CRZ_THINK === 'false' ? false : null,
   iterations: 0, max_iters: 0, wall_ms: 0, act_ms_total: 0,
   tokens_in: 0, tokens_out: 0, seeded: false, trace_errors: 0,
   completion: 0, path: 0, state: 0,

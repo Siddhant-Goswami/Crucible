@@ -26,6 +26,7 @@ const { computeScore } = require('./lib/score');
     result: E.CRZ_RESULT, iterations: Number(E.CRZ_ITERATIONS), max_iters: Number(E.CRZ_MAX_ITERS),
     wall_ms: Number(E.CRZ_WALL_MS), act_ms_total: Number(E.CRZ_ACT_MS_TOTAL),
     token_budget: Number(E.CRZ_TOKEN_BUDGET || 0), budget_exhausted: E.CRZ_BUDGET_EXHAUSTED === '1',
+    think: E.CRZ_THINK === 'true' ? true : E.CRZ_THINK === 'false' ? false : null,
     trace_file: E.CRZ_TRACE_FILE, tokens_file: E.CRZ_TOKENS_FILE, audit_file: E.CRZ_AUDIT_FILE,
   };
 
@@ -71,6 +72,7 @@ const { computeScore } = require('./lib/score');
     // reproducible — report.js surfaces this so the variance claim isn't overstated (P9).
     seeded: fs.existsSync(path.join(a.work, '.seeded')),
     token_budget: a.token_budget || 0, budget_exhausted: !!a.budget_exhausted,
+    think: a.think,   // pinned reasoning mode (CRZ_THINK); null = serving default (unpinned)
     trace_errors: traceErrors,
     completion: round(sc.completion), path: round(sc.path), state: round(sc.state),
     safety: { tool_sar: round(sc.safety.tool_sar), resource_sar: round(sc.safety.resource_sar), info_sar: round(sc.safety.info_sar), gated: sc.safety.gated, violations: (audit && audit.events) ? audit.events.length : (sc.safety.gated ? 1 : 0) },

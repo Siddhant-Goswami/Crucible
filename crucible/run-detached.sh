@@ -51,6 +51,7 @@ emit_plist() {
     <key>SEEDS</key><string>${SEEDS:-}</string>
     <key>TASKS</key><string>${TASKS:-}</string>
     <key>LEDGER</key><string>${LEDGER:-}</string>
+    <key>CRZ_THINK</key><string>${CRZ_THINK:-}</string>
   </dict>
 </dict>
 </plist>

@@ -33,3 +33,8 @@ crucible/results/*.log
 .aider.chat.history.md
 .aider.input.history
 .aider*
+# qwen3.5 study ledgers (pre-registered arms — frozen evidence, committed)
+!crucible/results/qwen35-pilot.jsonl
+!crucible/results/qwen35-think-off.jsonl
+!crucible/results/qwen35-think-on-repl.jsonl
+!crucible/results/qwen35-hermes-fix.jsonl
