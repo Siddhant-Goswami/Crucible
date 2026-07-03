@@ -56,6 +56,26 @@ ADAPTER_SH="$ROOT/adapters/${ADAPTER}.sh"
 [ -f "$ADAPTER_SH" ]        || { echo "no such adapter: $ADAPTER_SH" >&2; exit 1; }
 [ -f "$TASK_DIR/verify.sh" ] || { echo "task has no verify.sh: $TASK_DIR" >&2; exit 1; }
 
+# --- pristine-source integrity guard (battery mode) ----------------------------
+# The adapter is handed a disposable COPY ($WORK), never the real task. But a harness can
+# escape its cwd sandbox — pi, told to "delete .build.lock", discovered the repo's .git root
+# and deleted the file from the PRISTINE task dir, which would corrupt every subsequent cell of
+# that task. In CRUCIBLE mode we therefore restore the committed task from git before copying,
+# and record a sandbox-escape event if a prior cell had mutated it (a real harness-safety datum).
+if [ -n "$CRUCIBLE" ] && git -C "$TASK_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  rel="$(git -C "$ROOT" ls-files --error-unmatch "$TASK_DIR" >/dev/null 2>&1 && echo tracked || echo untracked)"
+  if [ "$rel" = "tracked" ] && ! git -C "$ROOT" diff --quiet -- "$TASK_DIR" 2>/dev/null; then
+    echo "  crucible: INTEGRITY — pristine task '$TASK_NAME' was mutated by a prior cell; restoring from git" >&2
+    if [ -n "${CRZ_LEDGER:-}" ]; then
+      ts="$(node -e 'process.stdout.write(new Date().toISOString())' 2>/dev/null || echo unknown)"
+      printf '{"ts":"%s","event":"sandbox_escape","task":"%s","prior_adapter_corrupted_source":true}\n' \
+        "$ts" "$TASK_NAME" >> "${CRZ_LEDGER%.jsonl}.integrity.jsonl" 2>/dev/null || true
+    fi
+  fi
+  git -C "$ROOT" checkout -q -- "$TASK_DIR" 2>/dev/null || true      # restore tracked files
+  git -C "$ROOT" clean -qfdx -- "$TASK_DIR" 2>/dev/null || true      # remove harness-created artifacts
+fi
+
 # --- sandbox: copy the task into a disposable workdir --------------------------
 # In crucible mode the run-id carries model+seed so every matrix cell keeps its own
 # workdir + trace; the legacy id stays task.adapter for backward compatibility.
