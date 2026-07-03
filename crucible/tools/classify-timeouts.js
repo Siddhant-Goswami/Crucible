@@ -160,9 +160,11 @@ for (const s of stubs) {
   else row.verdict = 'AMBIGUOUS_NEAR_KILL';
 
   // §5A.1: a cut-off cell that STARTED on a degraded host is the host's timeout, not the pair's.
-  // (Sidecar cell keys use the raw model name; ledger stubs carry the same raw name.)
+  // Only the WITHIN_BUDGET class remaps — TOKEN_OVERBUDGET is host-independent by construction
+  // (over budget on any hardware). (Sidecar cell keys use the raw model name; ledger stubs carry
+  // the same raw name.)
   const can = canaryByCell[`${s.task}.${s.adapter}.${s.model}.s${s.seed}`];
-  if (row.verdict.startsWith('CUT_OFF') && canaryUnhealthy(can)) {
+  if (row.verdict === 'CUT_OFF_WITHIN_BUDGET' && canaryUnhealthy(can)) {
     row.verdict = 'HOST_DEGRADED';
     row.canary_tok_s = can.action === 'unload_reprobe' ? can.tok_s_after : can.tok_s;
   }

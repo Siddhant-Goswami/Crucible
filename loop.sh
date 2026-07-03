@@ -64,7 +64,9 @@ ADAPTER_SH="$ROOT/adapters/${ADAPTER}.sh"
 # and record a sandbox-escape event if a prior cell had mutated it (a real harness-safety datum).
 if [ -n "$CRUCIBLE" ] && git -C "$TASK_DIR" rev-parse --git-dir >/dev/null 2>&1; then
   rel="$(git -C "$ROOT" ls-files --error-unmatch "$TASK_DIR" >/dev/null 2>&1 && echo tracked || echo untracked)"
-  if [ "$rel" = "tracked" ] && ! git -C "$ROOT" diff --quiet -- "$TASK_DIR" 2>/dev/null; then
+  # status --porcelain -uno (not diff --quiet): catches STAGED mutations too — an escape that
+  # ran `git add` would make worktree==index and slip past a plain diff.
+  if [ "$rel" = "tracked" ] && [ -n "$(git -C "$ROOT" status --porcelain -uno -- "$TASK_DIR" 2>/dev/null)" ]; then
     echo "  crucible: INTEGRITY — pristine task '$TASK_NAME' was mutated by a prior cell; restoring from git" >&2
     if [ -n "${CRZ_LEDGER:-}" ]; then
       ts="$(node -e 'process.stdout.write(new Date().toISOString())' 2>/dev/null || echo unknown)"
@@ -72,8 +74,8 @@ if [ -n "$CRUCIBLE" ] && git -C "$TASK_DIR" rev-parse --git-dir >/dev/null 2>&1;
         "$ts" "$TASK_NAME" >> "${CRZ_LEDGER%.jsonl}.integrity.jsonl" 2>/dev/null || true
     fi
   fi
-  git -C "$ROOT" checkout -q -- "$TASK_DIR" 2>/dev/null || true      # restore tracked files
-  git -C "$ROOT" clean -qfdx -- "$TASK_DIR" 2>/dev/null || true      # remove harness-created artifacts
+  git -C "$ROOT" checkout -q HEAD -- "$TASK_DIR" 2>/dev/null || true  # restore worktree AND index from HEAD
+  git -C "$ROOT" clean -qfdx -- "$TASK_DIR" 2>/dev/null || true       # remove harness-created artifacts
 fi
 
 # --- sandbox: copy the task into a disposable workdir --------------------------

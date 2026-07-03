@@ -12,8 +12,10 @@ const path = require('node:path');
 const TASKS = path.resolve(__dirname, '..', 'tasks');
 
 function fresh(taskId) {
+  // fs.cpSync, not `cp -R src/ dst/`: BSD cp copies the CONTENTS on a trailing slash,
+  // GNU cp nests a dst/<taskId>/ subdir — the tests must be location-correct on both.
   const dst = fs.mkdtempSync(path.join(os.tmpdir(), 'cru-t1-'));
-  execSync(`cp -R "${path.join(TASKS, taskId)}/" "${dst}/"`);
+  fs.cpSync(path.join(TASKS, taskId), dst, { recursive: true });
   return dst;
 }
 const sh = (cmd, cwd) => execSync(cmd, { cwd, stdio: 'pipe' }).toString();
