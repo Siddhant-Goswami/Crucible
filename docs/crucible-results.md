@@ -408,7 +408,7 @@ pre-registered design (hypotheses §5.1) demanded ≥3. Phase D ran the third:
 hardened proof-carrying T1 trio** — their first appearance in a published ledger) ×
 **5 seeds** = **341 cells** (`phase-d-llama.jsonl`), under the full §5A hardening (per-model
 timeout fit 30s, seeded shuffle `ORDER_SEED=42`, health canary). Ledger quality: 0 errors,
-**0 HOST_DEGRADED canary events** (331 probes), 5 timeouts — all harness-attributable
+**0 HOST_DEGRADED canary events** (330 probes), 5 timeouts — all harness-attributable
 (4 `aider`, 1 `goose`).
 
 | Harness | Goodput | Rel% |
@@ -425,19 +425,20 @@ The pre-registered predictions hold **out-of-sample**:
 - **H2 (reach) confirmed.** `aider` again tops the lean field and is nonzero on a 4th local
   model / 3rd family (0.49 / 0.59 / 0.81 / 0.64); the tool-callers remain model-specific —
   `pi` (0.83 on qwen3.5:9b) falls to **0.18 on llama, significantly below the thin control**
-  (Δ(ollama−pi) = 0.41 [0.01, 0.77], task-clustered bootstrap). Only tolerant text parsing
-  travels across families.
+  (Δ(ollama−pi) = 0.41 [0.01, 0.75], task-clustered bootstrap, seeded — reproduced exactly by
+  `audit-claims.js`). Only tolerant text parsing travels across families.
 - **H3a extended.** `codex` is a structural 0 on a 4th local model — now **0/144 local cells**
   across 3 families — while remaining 20/20 on its native cloud model.
-- **Top-pack tie replicates.** `aider` vs `ollama` Δ=0.05 [−0.07, 0.20], n.s. — attribution
+- **Top-pack tie replicates.** `aider` vs `ollama` Δ=0.05 [−0.04, 0.17], n.s. — attribution
   is strong at the extremes, honestly weak among good harnesses, exactly as the pilot read.
 - **Hardened T1 discriminates as designed.** Only tool-calling harnesses pass any T1 cell
-  (`pi` 3/15, `goose` 1/15); `aider` 0/15 (replicating its pilot T1 failure), file-only
-  `ollama` 0 by construction — and the nonce+sha256 proof-of-execution closes the §6.3
-  hand-writing bypass.
+  (`pi` 3/15 clean at score ≥0.9 — two further verifier passes are safety-gated — `goose`
+  1/15); `aider` 0/15 (replicating its pilot T1 failure), file-only `ollama` 0 by
+  construction — and the nonce+sha256 proof-of-execution closes the §6.3 hand-writing bypass.
 
 *(Numbers regenerate via `node crucible/report.js crucible/results/phase-d-llama.jsonl`
-→ `SCORECARD-phase-d-llama.md`; pin these claims in `audit-claims.js` before publication.)*
+→ `SCORECARD-phase-d-llama.md`; every claim above is pinned in `audit-claims.js` (claims
+27–34), including the clustered-bootstrap CIs, which are seeded and exactly reproducible.)*
 
 ## 7. Reproduce
 

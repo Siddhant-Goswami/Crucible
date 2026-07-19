@@ -26,8 +26,8 @@
 
 | # | Task | Who | Done when |
 |---|------|-----|-----------|
-| S1.1 | Pin the §6.8 Phase D claims in `crucible/audit-claims.js` (aider 0.64/93%, pi 0.18, Δ(ollama−pi)=0.41 CI excl. 0, codex 0/55 in phase-d ledger, T1 pi 3/15, 0 HOST_DEGRADED, 341 rows) reading `phase-d-llama.jsonl`; CI must fail on drift | Claude | `node crucible/audit-claims.js` passes; a deliberately perturbed number fails |
-| S1.2 | Figures: (a) codex interface-fit discontinuity — 0/144 local vs 20/20 gpt-5.5, bar chart; (b) qwen3.5 size ladder Goodput curves (pi/ollama/aider/codex × 2b/4b/9b, Table 2 data). Generate from ledgers (script in `paper/figs/`), include in main.tex, keep page count ≤ limit | Claude | PDF recompiles with both figures, sourced from committed ledgers |
+| S1.1 | ✅ **DONE 2026-07-19.** Pin the §6.8 Phase D claims in `crucible/audit-claims.js` (aider 0.64/93%, pi 0.18, Δ(ollama−pi)=0.41 CI excl. 0, codex 0/55 in phase-d ledger, T1 pi 3/15, 0 HOST_DEGRADED, 341 rows) reading `phase-d-llama.jsonl`; CI must fail on drift. *Claims 27–34 added (36 total, all pass; perturbation verified to fail). The clustered-bootstrap CIs are now seeded/deterministic — doc + paper endpoints updated to the canonical values: Δ(ollama−pi)=0.41 [0.01, 0.75], Δ(aider−ollama)=0.05 [−0.04, 0.17]. T1 clarified: pi 3/15 clean (score ≥0.9), 5 verifier passes of which 2 safety-gated.* | Claude | `node crucible/audit-claims.js` passes; a deliberately perturbed number fails |
+| S1.2 | ✅ **DONE 2026-07-19.** Figures: (a) codex interface-fit discontinuity — 0/144 local vs 20/20 gpt-5.5, bar chart; (b) qwen3.5 size ladder Goodput curves (pi/ollama/aider/codex × 2b/4b/9b, Table 2 data). *`paper/figs/make-figs.js` regenerates both panels as TikZ from the frozen ledgers and dies on census drift; CI runs `make-figs.js --check`. PDF now 8 pages (limit 9).* | Claude | PDF recompiles with both figures, sourced from committed ledgers |
 | S1.3 | Decide author block + affiliation (currently sole author, 100x email). Settle co-authors BEFORE arXiv | **User** | final author list in main.tex |
 | S1.4 | Make the GitHub repo public (paper cites it as the artifact) | **User** | repo URL resolves publicly |
 | S1.5 | arXiv submission: create/verify account, obtain endorsement if needed (cs.SE primary, cross-list cs.AI/cs.LG — endorsement can take days, START EARLY), upload, get arXiv ID | **User** (Claude preps the tarball) | arXiv ID live |
@@ -46,11 +46,31 @@
 
 | # | Task | Who | Done when |
 |---|------|-----|-----------|
-| S3.1 | Research the published NeurIPS 2026 accepted-workshop list; shortlist agent-evaluation / agents-in-the-wild / LLM-eval successors; confirm each's exact deadline, page limit, anonymization policy, style file | Claude | shortlist w/ deadlines in this file |
+| S3.1 | ✅ **DONE 2026-07-19** (early — acceptances went out Jul 11; shortlist below). Research the published NeurIPS 2026 accepted-workshop list; shortlist agent-evaluation / agents-in-the-wild / LLM-eval successors; confirm each's exact deadline, page limit, anonymization policy, style file | Claude | shortlist w/ deadlines in this file |
 | S3.2 | Pick the workshop | **User** | decision recorded here |
 | S3.3 | Reformat: swap preamble for the workshop `.sty`, anonymize if double-blind (strip author block, de-identify repo link via anonymous.4open.science if required), fit page limit (move Phase D detail to appendix if needed) | Claude | venue-compliant PDF |
 | S3.4 | OpenReview account (work email) + submit; verify PDF renders in their viewer | **User** | submission confirmed |
 | S3.5 | Fallbacks if timing slips: TMLR (rolling, archival) or ICLR 2027 workshops (~Feb 2027) | — | — |
+
+### S3.1 shortlist (researched 2026-07-19)
+
+NeurIPS 2026 is **multi-venue**: Sydney (workshops Dec 11–12), Paris & Atlanta (Dec 12–13).
+Workshop acceptances were announced Jul 11, 2026; venue-recommended contribution deadline is
+Aug 29, mandatory author notification Sep 29. 26 workshops are live on OpenReview so far
+(`api2.openreview.net/groups?parent=NeurIPS.cc/2026/Workshop`) — more may still appear;
+re-check before S3.2. Ranked by fit:
+
+| Rank | Workshop | City | Deadline | Format | Blind? | Notes |
+|---|---|---|---|---|---|---|
+| 1 | **SLM-Agents** — 1st Workshop on SLMs for Agentic Systems (`slmw2026.github.io`) | Paris | **Aug 29 AoE** | 4pp abstract or 8pp full + refs, NeurIPS workshop template, non-archival | **double-blind** | Dead-center fit: small local models in agentic systems, efficiency metrics, trustworthiness. Crucible's "harness substitutes for scale" result is a headline claim for this audience. Needs anonymized variant (S3.3). |
+| 2 | **JUDGe** — Reliable Evaluation for Language Models (`judge2026.github.io`) | Atlanta | **Sep 5 AoE** (a week extra) | 6pp full / 4pp short + refs, NeurIPS template, non-archival | **double-blind** | Evaluation-methodology angle: construct validity, benchmark construction, timeout-exclusion bias, CI drift guard. Welcomes negative results + works in progress. |
+| 3 | **Verify-Agents** — Who Verifies the Agents? (`verify-agents-workshop.github.io`) | Sydney | Aug 29 AoE | CFP details **still pending** on site | TBD | Pillars include reward hacking / specification gaming (our verifier-gaming + hardening finding) and multi-objective eval (cost/safety). Watch the site. |
+| 4 | **SEA** — Scaling Environments for Agents (`sea-workshop.github.io`) | TBD | Aug 29 | 4pp short / 9pp long + refs, non-archival | not stated | Environment design & benchmarking + terminal/SWE environments tracks; apparatus-as-artifact fits. Not yet on OpenReview. |
+| 5 | **VeriCodeGen** — AI for Verifiable Coding (`vericodegen.github.io`) | Atlanta | Aug 29 AoE | not yet published | TBD | Weaker fit (formal-methods slant), but coding-agent verification is in scope. |
+
+Also live but weaker fits: Meta-Agents (agents managing agents, Sydney), FAST (agentic-systems
+theory, Paris), MLForSys (Sydney). The NeurIPS 2026 Evaluations & Datasets main track is closed
+for this cycle — it stays a 2027 target (backlog).
 
 ## Backlog (post-submission / main-track upgrade)
 

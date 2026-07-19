@@ -13,6 +13,13 @@
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+% figure palette (Okabe–Ito, colorblind-safe; validated) — used by figs/*.tex
+\definecolor{figblue}{HTML}{0072B2}
+\definecolor{figvermilion}{HTML}{D55E00}
+\definecolor{figgreen}{HTML}{009E73}
+\definecolor{figpink}{HTML}{CC79A7}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
 \usepackage{enumitem}
@@ -192,7 +199,7 @@ Local models: \texttt{deepseek-r1:1.5b}, \texttt{deepseek-r1:8b} (reasoning, inl
 harnesses (via an API shim), plus metered OpenAI arms.
 
 \textbf{Integrity.} Every published number regenerates from committed JSONL ledgers; a CI
-guard recomputes $\sim$20 pinned claims from the frozen ledger and fails the build on drift.
+guard recomputes 36 pinned claims from the frozen ledgers and fails the build on drift.
 Runs are sandboxed into throwaway copies; a pristine-source guard restores each task from git
 before every cell and logs sandbox escapes (it fired twice in production, catching a harness
 deleting a file from the pristine task source). Cells are killed at a per-(model, host)
@@ -265,12 +272,33 @@ harness hangs with zero host-degraded cells---evidence the controls work.
 \subsection{Interface-fit, not capability, is often the binding constraint}
 \label{sec:fit}
 
+\begin{figure}[t]
+\centering
+\begin{minipage}[t]{0.48\linewidth}
+\centering
+\input{figs/codex-bookend}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\centering
+\input{figs/ladder}
+\end{minipage}
+\caption{\textbf{(left)} The interface-fit discontinuity: \texttt{codex} pass rate over
+finished cells, per model---0/144 across five local models in three families (the qwen3.5
+size ladder adds 54 further zero cells not in this census) versus 20/20 on its native cloud
+model, with the harness held fixed. \textbf{(right)} Phase~C size ladder: \goodput{} across
+the \texttt{qwen3.5} family (thinking off, full hardening). The \texttt{pi} harness on the
+2.7\,GB model beats the thin control on a model $2.4\times$ larger; \texttt{codex} is flat
+at 0 at every size. Both panels regenerate from the committed run ledgers
+(\texttt{paper/figs/make-figs.js}).}
+\label{fig:bookend}
+\end{figure}
+
 \textbf{The Codex bookend (cleanest result).} \texttt{codex} scores 0 across all 89 local
 cells---every failure an artifact-commitment failure: its headless runner requires the model
 to speak its structured tool-call dialect, and no local model in the panel can. The same
 harness, pointed at its native cloud model (\texttt{gpt-5.5}), passes 20/20 (5 seeds
 $\times$ 4 tasks, every cell one iteration, Safety $=1$), \emph{including} the hardened
-tool-recovery task. A model swap alone produces a $0 \to 1$ discontinuity with the harness
+tool-recovery task (Figure~\ref{fig:bookend}, left). A model swap alone produces a $0 \to 1$ discontinuity with the harness
 held fixed. The home-turf confound is addressed: on a \emph{non-native} mid-tier cloud model
 (\texttt{gpt-4o-mini}), the tool-required task splits by harness \emph{type}---text-diff
 \texttt{aider} fails 0/3 while tool-calling \texttt{pi} passes 3/3---so the success is
@@ -317,7 +345,8 @@ on a model $2.4\times$ larger.}
 \label{tab:ladder}
 \end{table}
 
-Table~\ref{tab:ladder}: on the 2.7\,GB \texttt{qwen3.5:2b}---which alone passes only 1/9
+Table~\ref{tab:ladder} (drawn as curves in Figure~\ref{fig:bookend}, right): on the
+2.7\,GB \texttt{qwen3.5:2b}---which alone passes only 1/9
 tasks at the calibration floor---the thin control scores 0.24 while \texttt{pi} scores 0.79,
 $\Delta{=}0.55$ [0.18, 0.87] (task-clustered bootstrap, significant). \texttt{pi} at 2b
 even beats the control at 9b (0.64): the scaffold buys more than a $2.4\times$ model-size
@@ -343,12 +372,14 @@ canary events, all 5 timeouts harness-attributable. The predictions hold out-of-
 \texttt{aider} is again the top lean harness and again nonzero (\goodput{} 0.64 at 93\%
 finish)---nonzero on all four local models across three families---while the tool-calling
 harnesses remain model-specific: \texttt{pi} falls to 0.18, \emph{significantly below the
-thin control} ($\Delta_{\text{ollama}-\text{pi}}{=}0.41$ [0.01, 0.77], task-clustered
+thin control} ($\Delta_{\text{ollama}-\text{pi}}{=}0.41$ [0.01, 0.75], task-clustered
 bootstrap), and \texttt{hermes} and \texttt{goose} collapse to $\leq$0.03. \texttt{codex}
-extends its structural zero to a fourth local model (now 0/144 local cells). The top-pack
-tie replicates too: \texttt{aider} vs.\ the control is $\Delta{=}0.05$ [$-0.07$, 0.20],
-n.s. On the hardened T1 trio only tool-calling harnesses pass any cell (\texttt{pi} 3/15,
-\texttt{goose} 1/15; \texttt{aider} 0/15, file-only control 0 by construction)---the
+extends its structural zero to a fourth local model (now 0/144 local cells;
+Figure~\ref{fig:bookend}). The top-pack
+tie replicates too: \texttt{aider} vs.\ the control is $\Delta{=}0.05$ [$-0.04$, 0.17],
+n.s. On the hardened T1 trio only tool-calling harnesses pass any cell (\texttt{pi} 3/15
+clean plus two safety-gated passes, \texttt{goose} 1/15; \texttt{aider} 0/15, file-only
+control 0 by construction)---the
 pilot's T1 discrimination pattern, now under verifier-gaming-proof tasks.
 
 \subsection{At the frontier, quality compresses and cost discriminates}
