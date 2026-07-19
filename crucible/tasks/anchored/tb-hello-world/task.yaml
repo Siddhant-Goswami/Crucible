@@ -1,0 +1,13 @@
+id: tb-hello-world
+source: "Terminal-Bench (hello-world)"
+tier: T0
+domain: software-engineering
+capability_tags: ["file-operations"]
+budgets:
+  max_iters: 4
+  max_tokens: 200000
+  wall_timeout_s: 120
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

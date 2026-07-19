@@ -1,0 +1,41 @@
+{
+ "top_5_users_by_amount": {
+  "yuki_user": {
+   "total_amount": 71935.16,
+   "total_items": 982
+  },
+  "user234": {
+   "total_amount": 71031.9,
+   "total_items": 1315
+  },
+  "user418": {
+   "total_amount": 63981.62,
+   "total_items": 1474
+  },
+  "user168": {
+   "total_amount": 60226.92,
+   "total_items": 942
+  },
+  "user477": {
+   "total_amount": 60086.07,
+   "total_items": 2507
+  }
+ },
+ "top_5_tags_by_count": {
+  "important": {
+   "count": 473
+  },
+  "api": {
+   "count": 466
+  },
+  "alpha": {
+   "count": 465
+  },
+  "pending": {
+   "count": 465
+  },
+  "completed": {
+   "count": 464
+  }
+ }
+}

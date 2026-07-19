@@ -52,6 +52,9 @@ crucible/results/*.canary.jsonl
 # phase D confirmatory arm (3rd family, pre-registered) — frozen evidence, committed
 !crucible/results/phase-d-llama.jsonl
 !crucible/results/llama-t0-calib.jsonl
+# Sprint 2 external anchor (Terminal-Bench slice) — frozen evidence, committed
+!crucible/results/anchor-tb.jsonl
+!crucible/results/anchor-t0-calib.jsonl
 
 # harness sandbox-escape artifacts (tasks leak these to repo root; never commit)
 .lock-seen

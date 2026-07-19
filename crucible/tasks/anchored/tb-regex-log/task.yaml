@@ -1,0 +1,13 @@
+id: tb-regex-log
+source: "Terminal-Bench (regex-log)"
+tier: T2
+domain: software-engineering
+capability_tags: ["text-processing", "reasoning"]
+budgets:
+  max_iters: 8
+  max_tokens: 200000
+  wall_timeout_s: 300
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]
