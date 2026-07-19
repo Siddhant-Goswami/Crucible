@@ -4,9 +4,9 @@ tier: T3
 domain: software-engineering
 capability_tags: ["data-processing", "reasoning"]
 budgets:
-  max_iters: 8
+  max_iters: 5
   max_tokens: 200000
-  wall_timeout_s: 600
+  wall_timeout_s: 360
 oracle:
   type: tests
   partial_credit: false

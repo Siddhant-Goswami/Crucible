@@ -4,9 +4,9 @@ tier: T0
 domain: software-engineering
 capability_tags: ["file-operations"]
 budgets:
-  max_iters: 4
+  max_iters: 3
   max_tokens: 200000
-  wall_timeout_s: 120
+  wall_timeout_s: 90
 oracle:
   type: tests
   partial_credit: false
