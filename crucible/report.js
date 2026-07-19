@@ -46,7 +46,7 @@ const RNG = mulberry32(0xC0FFEE);
 const BOOT = 2000;
 
 // tier lookup: read each task's tier from its task.yaml (tasks/ or crucible/tasks/), cached.
-const TASK_DIRS = ['tasks', 'crucible/tasks'];
+const TASK_DIRS = ['tasks', 'crucible/tasks', 'crucible/tasks/anchored'];
 const tierCache = {};
 function tierOf(task) {
   if (task in tierCache) return tierCache[task];
