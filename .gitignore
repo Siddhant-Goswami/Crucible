@@ -49,8 +49,12 @@ crucible/results/*.canary.jsonl
 !crucible/results/cloud-openai-metered.jsonl
 !crucible/results/qwen35-t0-calib.jsonl
 !crucible/results/qwen35-scaled.jsonl
+# phase D confirmatory arm (3rd family, pre-registered) — frozen evidence, committed
+!crucible/results/phase-d-llama.jsonl
+!crucible/results/llama-t0-calib.jsonl
 
 # harness sandbox-escape artifacts (tasks leak these to repo root; never commit)
 .lock-seen
 /config/
 /report.txt
+/.roots/

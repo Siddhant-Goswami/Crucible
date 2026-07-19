@@ -400,6 +400,45 @@ timeout fits + seeded cell-shuffle + health canary). Goodput by harness × model
   job; these timeouts are harness-attributable. The pristine-source integrity guard also fired
   **twice in production**, catching sandbox escapes before they could corrupt later cells.
 
+### 6.8 Phase D — the pre-registered third-family confirmatory arm (out-of-sample)
+
+The reach/transfer claims (H2, H3a) were pilot-supported on only **2 local families**; the
+pre-registered design (hypotheses §5.1) demanded ≥3. Phase D ran the third:
+**`llama3.2:3b`** (Meta/Llama) × 7 harnesses × **11 tasks** (the full battery **plus the
+hardened proof-carrying T1 trio** — their first appearance in a published ledger) ×
+**5 seeds** = **341 cells** (`phase-d-llama.jsonl`), under the full §5A hardening (per-model
+timeout fit 30s, seeded shuffle `ORDER_SEED=42`, health canary). Ledger quality: 0 errors,
+**0 HOST_DEGRADED canary events** (331 probes), 5 timeouts — all harness-attributable
+(4 `aider`, 1 `goose`).
+
+| Harness | Goodput | Rel% |
+|---|--:|--:|
+| aider | **0.64** | 93% |
+| ollama (thin control) | 0.58 | 100% |
+| pi | 0.18 | 100% |
+| goose | 0.03 | 98% |
+| hermes | 0.00 | 100% |
+| codex | 0.00 | 100% |
+
+The pre-registered predictions hold **out-of-sample**:
+
+- **H2 (reach) confirmed.** `aider` again tops the lean field and is nonzero on a 4th local
+  model / 3rd family (0.49 / 0.59 / 0.81 / 0.64); the tool-callers remain model-specific —
+  `pi` (0.83 on qwen3.5:9b) falls to **0.18 on llama, significantly below the thin control**
+  (Δ(ollama−pi) = 0.41 [0.01, 0.77], task-clustered bootstrap). Only tolerant text parsing
+  travels across families.
+- **H3a extended.** `codex` is a structural 0 on a 4th local model — now **0/144 local cells**
+  across 3 families — while remaining 20/20 on its native cloud model.
+- **Top-pack tie replicates.** `aider` vs `ollama` Δ=0.05 [−0.07, 0.20], n.s. — attribution
+  is strong at the extremes, honestly weak among good harnesses, exactly as the pilot read.
+- **Hardened T1 discriminates as designed.** Only tool-calling harnesses pass any T1 cell
+  (`pi` 3/15, `goose` 1/15); `aider` 0/15 (replicating its pilot T1 failure), file-only
+  `ollama` 0 by construction — and the nonce+sha256 proof-of-execution closes the §6.3
+  hand-writing bypass.
+
+*(Numbers regenerate via `node crucible/report.js crucible/results/phase-d-llama.jsonl`
+→ `SCORECARD-phase-d-llama.md`; pin these claims in `audit-claims.js` before publication.)*
+
 ## 7. Reproduce
 
 ```bash

@@ -64,6 +64,12 @@ arms with real token accounting. Start with the plain-English
 synthesis of the 2026 harness literature in
 [docs/harness-first-principles.md](./docs/harness-first-principles.md).
 
+**Workshop paper:** [`paper/`](./paper/) holds the LaTeX draft (`tectonic main.tex` → 7pp PDF),
+verified bibliography, and submission checklist. The pre-registered **Phase D confirmatory arm**
+(3rd model family `llama3.2:3b` × 5 seeds × 11 tasks incl. the hardened T1 trio) runs via
+[`crucible/phase-d.sh`](./crucible/phase-d.sh) (`calibrate` → `start`/`status`/`stop`; detached
++ resumable).
+
 ## Quickstart (offline, $0, no install)
 
 ```bash

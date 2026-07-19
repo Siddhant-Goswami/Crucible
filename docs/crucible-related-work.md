@@ -93,10 +93,19 @@ length).
 
 **Strongly advisable:** SWE-bench Verified, τ-bench ([2406.12045](https://arxiv.org/abs/2406.12045), pass^k), Epoch "Why benchmarking is hard", METR time-horizon ([2503.14499](https://arxiv.org/abs/2503.14499)), Agent Arena, AgentDojo ([2406.13352](https://arxiv.org/abs/2406.13352)) / AgentHarm ([2410.09024](https://arxiv.org/abs/2410.09024)).
 
-> **Provenance note.** The P1–P9 backbone in `harness-first-principles.md` synthesizes seven 2026
-> harness-engineering papers (Harness-Bench 2605.27922, AHE 2604.25850, VeRO 2602.22480, HarnessAudit
-> 2605.14271, NLAH 2603.25723, Code-as-Agent-Harness 2605.18747, RUCAIBox survey). These were
-> independently verified to exist (arxiv + HuggingFace Papers + author-matching GitHub repos +
-> project sites), but they postdate common training cutoffs — **verify each DOI resolves before
-> camera-ready.** They ground the *concepts*; the works in §5 above ground the *positioning*, and a
-> submission needs both.
+> **Provenance note (verified 2026-07-18 against the arXiv API).** The P1–P9 backbone in
+> `harness-first-principles.md` synthesizes seven 2026 harness-engineering papers. **All seven were
+> re-verified via export.arxiv.org: 6/7 arXiv IDs resolve and match** — Harness-Bench
+> ([2605.27922](https://arxiv.org/abs/2605.27922), Yao et al.), AHE
+> ([2604.25850](https://arxiv.org/abs/2604.25850), Lin et al., Fudan), VeRO
+> ([2602.22480](https://arxiv.org/abs/2602.22480), Ursekar et al., **ICML 2026**; canonical v4
+> title "VeRO: A Harness for Agents to Optimize Agents"), "Auditing Agent Harness Safety"
+> ([2605.14271](https://arxiv.org/abs/2605.14271), Liu et al. — *HarnessAudit is the framework
+> name, not the paper title*), NLAH ([2603.25723](https://arxiv.org/abs/2603.25723), Pan et al.),
+> and Code as Agent Harness ([2605.18747](https://arxiv.org/abs/2605.18747), Ning et al.). The
+> **RUCAIBox survey has no arXiv ID** — cite it as Tang et al. 2026, "Agent Systems with Harness
+> Engineering", via [OpenReview nM5tDHrQsx](https://openreview.net/pdf?id=nM5tDHrQsx) /
+> [github.com/RUCAIBox/awesome-agent-harness](https://github.com/RUCAIBox/awesome-agent-harness);
+> an arXiv-hosted alternative harness survey is [2606.20683](https://arxiv.org/abs/2606.20683)
+> (Guo et al., different group). They ground the *concepts*; the works in §5 above ground the
+> *positioning*, and a submission needs both. Verified BibTeX entries live in `paper/refs.bib`.

@@ -1,0 +1,461 @@
+% Crucible — workshop paper draft
+% Compile: tectonic main.tex   (or upload the paper/ directory to Overleaf, pdflatex+bibtex)
+% Target: NeurIPS 2026 agent/eval workshop (non-archival, 6–9 pp). To submit to a specific
+% workshop, swap \documentclass and this preamble for the workshop's style file; the body is
+% style-agnostic.
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+\usepackage{enumitem}
+\setlist{itemsep=1pt,topsep=2pt,parsep=0pt}
+
+\newcommand{\goodput}{\textsc{Goodput}}
+\newcommand{\crucible}{\textsc{Crucible}}
+\newcommand{\pair}[2]{\texttt{#1}\,@\,\texttt{#2}}
+
+\title{\textbf{Measure the Harness, Not the Model:\\
+A Controlled Study of Coding-Agent Harnesses\\ Across Local and Cloud Models}}
+
+\author{%
+  Siddhant Goswami\\
+  100x Engineers\\
+  \texttt{content@100xengineers.com}%
+}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A coding agent is a \emph{pair}: $\text{Agent} = \text{Model} + \text{Harness}$, where the
+harness is the software around the model---prompt assembly, tools, the execution loop,
+verification, recovery, and permissions. Most benchmarks score the pair jointly and attribute
+the result to the model. We present \crucible{}, an apparatus that holds the model fixed and
+makes the \emph{harness} the experimental variable: a factorial harness$\times$model$\times$seed
+protocol over a tiered task battery, scored per \emph{run} (not per output) with a gated,
+non-substitutable profile, $\text{Score} = \text{Safety} \times (0.6\,\text{Completion} +
+0.2\,\text{Path} + 0.2\,\text{State})$, and reported as \goodput{}: gated score over
+\emph{all} attempts with timeouts counted as zero. In an exploratory pilot of 8 harnesses
+(Claude Code, aider, Codex CLI, Goose, Pi, Hermes, a thin file-block control, and a
+deterministic floor) on 3 local models plus cloud references---515 frozen runs, extended by a
+222-run within-family size ladder, a 20-run cloud bookend, and a pre-registered 341-run
+third-family confirmatory arm---we observe: (i)~\emph{interface-fit,
+not capability, is often the binding constraint}: Codex CLI scores 0 on all 89 local cells yet
+20/20 on its native cloud model, a discontinuity produced by a model swap alone; (ii)~\emph{the
+harness substitutes for scale where capability is scarcest}: on a 2.7\,GB model the minimalist
+Pi harness reaches \goodput{} 0.79 versus 0.24 for the thin control ($\Delta{=}0.55$
+[0.18, 0.87]), beating the control on a model $2.4\times$ larger; (iii)~\emph{excluding
+timeouts---common practice---inverts harness rankings} (a harness at 1.00 finished-only falls
+to 0.70; another from 0.99 to 0.33); and (iv)~a multiplicative safety gate catches boundary
+violations on runs that \emph{complete}. All numbers regenerate deterministically from
+committed run ledgers and are guarded in CI against drift. We release the apparatus, the
+ledgers, and a pre-registered confirmatory design.
+\end{abstract}
+
+\section{Introduction}
+
+Agent benchmarks overwhelmingly vary the model and hold the scaffold fixed---or worse, vary
+both and report one number. Yet the scaffold moves the score: swapping scaffolds shifts
+SWE-bench results by 10--20 points \citep{swebench,epoch2024benchmarking}, SWE-agent's
+agent--computer interface alone unlocked large gains \citep{sweagent}, and the Holistic Agent
+Leaderboard finds two scaffolds on the same model disagree on a large fraction of tasks
+\citep{hal}. The field knows \emph{that} the harness matters. What is missing is an instrument
+that \emph{measures} it: holding the model fixed, how much does the harness change correctness,
+process, safety, and cost---and does that advantage transfer across models?
+
+\crucible{} is that instrument. It runs the same task, under the same deterministic verifier,
+budget, and seeds, through interchangeable harness adapters---commercial CLI agents (Claude
+Code, aider, Codex CLI, Goose), lean open-source harnesses (Pi, Hermes), a thin file-block
+control, and a deterministic mock floor---against local models small enough that the harness,
+not the model, decides the outcome. Contributions:
+
+\begin{enumerate}
+\item \textbf{A harness-first measurement apparatus} (\S\ref{sec:apparatus}): a one-line
+  adapter contract; a tiered, discriminating task battery; per-run trace scoring with a
+  multiplicative safety gate; uniform token metering via a logging proxy; frozen, committed
+  run ledgers with a CI guard that fails the build if any published number drifts.
+\item \textbf{Interface-fit as a predictive mechanism} (\S\ref{sec:fit}): whether a
+  (harness, model) pair succeeds is often bound by the compatibility between the harness's
+  expected I/O shape and the model's output shape, not by model capability. The cleanest
+  demonstration is a bookend: Codex CLI is a structural zero on every local model (0/89) and
+  perfect on its native cloud model (20/20, 5 seeds $\times$ 4 tasks)---the harness held
+  fixed, only the model swapped.
+\item \textbf{\goodput{}: reliability as a first-class methodological correction}
+  (\S\ref{sec:goodput}): scoring only finished runs inverts rankings; counting timeouts as
+  zeros reorders the field toward harnesses that \emph{deliver}. A per-cell timeout autopsy
+  separates harness hangs from host-conditional latency.
+\item \textbf{A routing artifact} (\S\ref{sec:routing}): per (model, task-tier)
+  best-achievable local \goodput{}, yielding a local-vs-cloud escalation rule keyed on the
+  task's \emph{tool-capability tier}---a signal prompt-difficulty routers
+  \citep{routellm,hybridllm} cannot see.
+\end{enumerate}
+
+We are explicit about epistemic status (\S\ref{sec:limits}): the 515-run battery is an
+\emph{exploratory pilot}; hypotheses were sharpened from it, so its support is in-sample.
+A pre-registered scaled design (\S\ref{sec:prereg}) states the confirmatory predictions,
+including the primary one the thesis lives or dies on.
+
+\section{Related work}
+\label{sec:related}
+
+\textbf{Benchmarks that conflate model and harness.} SWE-bench \citep{swebench}, AgentBench
+\citep{agentbench}, GAIA \citep{gaia}, OSWorld \citep{osworld}, and Terminal-Bench
+\citep{terminalbench} score the (model, scaffold) pair jointly. MLE-bench \citep{mlebench}
+compares scaffolds ad hoc; SWE-agent \citep{sweagent} demonstrates the interface is
+first-class but does not make it the measured variable. Aider's polyglot leaderboard fixes
+the harness and varies the model---the inverse of our design.
+
+\textbf{Harness/scaffold as the variable.} HAL \citep{hal} is the closest system: cost-aware,
+process-level evaluation at 21{,}730-rollout scale, observing scaffold disagreement. HAL is
+model-first and descriptive; \crucible{} is harness-first and inferential---a factorial design
+with a cross-model transfer (rank-stability) test, a multiplicative safety gate, and
+deterministic trace scoring instead of LLM log analysis. Recent work evolves harnesses
+automatically and reports cross-model transfer of harness gains \citep{ahe}; we measure
+harnesses rather than optimize them. Overeager-agent measurements \citep{overeager} find
+framework architecture dominates out-of-scope behavior---the safety-side complement to our
+capability-side attribution, which our gate unifies into one score. Agent Arena decomposes
+agents into model$\times$framework$\times$tools but ranks by subjective ELO; \crucible{} uses
+deterministic oracles and fixed budgets.
+
+\textbf{Evaluation methodology.} We adopt the cost-controlled stance of \citet{aiagents}
+(cost reported alongside, never folded in), the statistical reporting of \citet{errorbars}
+(bootstrap CIs, paired comparisons, clustered resampling), reliability-over-repeats from
+$\tau$-bench's pass\textasciicircum{}$k$ \citep{taubench}, and the task-validity concerns of
+the ABC checklist \citep{abc}---one of our own findings (\S\ref{sec:frontier}) is an instance
+of the verifier-gaming failure ABC catalogs, which we report and harden against.
+
+\textbf{Routing.} RouteLLM \citep{routellm}, FrugalGPT \citep{frugalgpt}, and Hybrid LLM
+\citep{hybridllm} route on predicted per-prompt difficulty or quality gap. None route on
+task-tool requirements; our tier-keyed escalation rule is exactly that missing signal.
+
+\textbf{Safety.} AgentHarm \citep{agentharm}, AgentDojo \citep{agentdojo}, and ToolEmu
+\citep{toolemu} score model refusal/robustness on a fixed harness; our T4 tier instead asks
+whether the \emph{harness} contains the blast radius, with deterministic per-channel policy
+checks and a gate that completion cannot buy back.
+
+\section{The \crucible{} apparatus}
+\label{sec:apparatus}
+
+\textbf{Adapter contract.} A harness is integrated by one script:
+\texttt{adapters/<name>.sh <workdir> <iter> <feedback>}---read the goal from
+\texttt{TASK.md}, read the last verifier feedback, make one attempt by editing files.
+The bounded loop (act $\to$ verify $\to$ repeat, capped iterations) is owned by the runner,
+so every harness runs the identical protocol. Lean harnesses are wired to the same local
+model endpoint, making the harness the only variable in a row.
+
+\textbf{Scoring the run, not the output.} Each run emits a per-iteration trace. The score is
+gated and non-substitutable:
+\[
+\text{Score} \;=\; \text{Safety} \times \bigl(0.6\cdot\text{Completion} \;+\;
+0.2\cdot\text{Path} \;+\; 0.2\cdot\text{State}\bigr)
+\]
+Safety $= \min(\text{tool},\text{resource},\text{info})$ per-channel adherence against a
+\emph{hidden} per-task policy---multiplicative, so a boundary violation collapses the score
+regardless of completion, and the audit fails closed. Completion is a deterministic oracle
+(\texttt{verify.sh}) with checkpoint partial credit; Path (action validity, recovery) and
+State (checkpoint progress preserved across iterations) are computed from the trace with no
+LLM judge. Cost---metered tokens via a logging proxy, wall time, successes per Mtoken---is
+reported alongside, never folded in \citep{aiagents}.
+
+\textbf{\goodput{}.} The headline metric is the gated score averaged over \emph{all}
+attempts with each timeout counted as 0, reported next to the finish rate. \S\ref{sec:goodput}
+shows why the conventional alternative (score over finished runs) is not a detail.
+
+\textbf{Task battery.} Nine tasks in five tiers, each \texttt{TASK.md} + deterministic
+\texttt{verify.sh} + \texttt{task.yaml} (tier, budgets, safety policy, seeds): T0 single-file
+fixes (calibration floor); T1 \emph{tool-recovery}---the sharpest discriminator: the task
+passes only by \emph{running} a generator that fails on first invocation and must be retried,
+so a file-only harness cannot pass by construction (hardened post-pilot with a
+nonce{+}sha256 proof-of-execution after a frontier model hand-wrote the fixture,
+\S\ref{sec:frontier}); T2 multi-file consistency (regressions ding State); T3 artifact
+generation with sourcing requirements; T4 safety---a prompt-injection/secret-redaction task
+where leaking the secret zeroes the score even on a completed run. Tasks are discriminating
+\emph{by design}; external anchoring is future work (\S\ref{sec:prereg}) via a task-import
+contract that wraps external suites.
+
+\textbf{Panel.} Harnesses: \texttt{claude} (Claude Code, frontier reference), \texttt{aider}
+(repo-map, diff-driven), \texttt{codex} (OpenAI Codex CLI, structured tool protocol),
+\texttt{goose}, \texttt{pi} (sub-1k-token prompt, 4 tools), \texttt{hermes},
+\texttt{ollama} (thin file-block parser---the control), \texttt{mock} (deterministic floor).
+Local models: \texttt{deepseek-r1:1.5b}, \texttt{deepseek-r1:8b} (reasoning, inline
+\texttt{<think>} narration), \texttt{qwen3:8b} (clean output); the size-ladder study adds
+\texttt{qwen3.5} \{2b, 4b, 9b\}. Cloud arms: Claude as a harness and as a model behind lean
+harnesses (via an API shim), plus metered OpenAI arms.
+
+\textbf{Integrity.} Every published number regenerates from committed JSONL ledgers; a CI
+guard recomputes $\sim$20 pinned claims from the frozen ledger and fails the build on drift.
+Runs are sandboxed into throwaway copies; a pristine-source guard restores each task from git
+before every cell and logs sandbox escapes (it fired twice in production, catching a harness
+deleting a file from the pristine task source). Cells are killed at a per-(model, host)
+fitted wall timeout; a host-health canary probes generation rate before every cell and the
+cell order is deterministically shuffled, decorrelating host drift from any block
+(\S\ref{sec:goodput}).
+
+\section{Results}
+\label{sec:results}
+
+All numbers below are from the frozen pilot ledger (515 runs: 8 harnesses $\times$ 3 local
+models $\times$ up to 9 tasks $\times$ 3 seeds, plus cloud slices), the Phase~B cloud bookend
+(20 runs), and the Phase~C size ladder (222 runs). 95\% intervals are seeded bootstrap;
+paired comparisons use a task-clustered bootstrap (resample tasks, then seeds). We label
+every claim's status per the pre-registration discipline of \S\ref{sec:prereg}: the pilot is
+exploratory and in-sample.
+
+\subsection{Harness attribution is large; reliability reorders the field}
+\label{sec:goodput}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Harness & \texttt{deepseek-r1:1.5b} & \texttt{qwen3:8b} & \texttt{deepseek-r1:8b} & \texttt{claude-opus-4-8}\\
+\midrule
+claude (Claude Code) & --- & --- & --- & \textbf{1.00} (12 cells, \$1.38/run)\\
+aider    & \textbf{0.49} \,(85\%) & 0.59 \,(81\%) & \textbf{0.81} \,(93\%) & ---\\
+ollama (thin control) & 0.12 & \textbf{0.88} \,(96\%) & 0.63 \,(93\%) & ---\\
+pi       & 0.00 & 0.70 \,(70\%) & 0.00 & ---\\
+hermes   & 0.00 & \textbf{0.91} \,(100\%) & 0.00 & ---\\
+goose    & 0.00 \,(89\%) & 0.33 \,(\textbf{33\%}) & 0.00 \,(89\%) & ---\\
+codex    & 0.00 & 0.00 & 0.00 & ---\\
+mock (floor) & 0.13 & --- & --- & ---\\
+\bottomrule
+\end{tabular}
+\caption{\goodput{} per \pair{harness}{model} on the 515-run pilot (finish rate in
+parentheses where any attempt timed out). Holding the model fixed, harness choice spans
+near-0 to near-1 on every model column.}
+\label{tab:scorecard}
+\end{table}
+
+Table~\ref{tab:scorecard} is the capacity scorecard. On \texttt{qwen3:8b} the harness alone
+spans \goodput{} 0.00 (\texttt{codex}) to 0.91 (\texttt{hermes}); on
+\texttt{deepseek-r1:1.5b}, \texttt{aider} beats the thin control by $\Delta{=}0.37$
+[0.16, 0.59] (significant, paired clustered bootstrap). Attribution is strong at the
+extremes and honestly weak among good harnesses: the top pair on \texttt{qwen3:8b}
+(\texttt{hermes} vs.\ \texttt{ollama}) is a statistical tie ($\Delta{=}0.03$
+[$-0.02$, 0.11]).
+
+\textbf{Excluding timeouts inverts rankings.} Under the common finished-runs-only score,
+\pair{pi}{qwen3:8b} reads 1.00 and \pair{goose}{qwen3:8b} 0.99---top of the field. But
+\texttt{goose} finished 9 of 27 attempts and \texttt{pi} 19 of 27: as \goodput{} they fall
+to 0.33 and 0.70, and the honest leaders are the harnesses that \emph{deliver}
+(\texttt{hermes} 0.91 at 100\% finish, \texttt{ollama} 0.88 at 96\%). Any evaluation that
+drops non-finishing runs systematically flatters exactly the harnesses that hang.
+
+\textbf{What a timeout is (autopsy).} A per-cell autopsy of all 55 pilot timeouts, using
+three independent evidence sources (workdir mtimes, proxy events, server request windows),
+attributes 51 to host-conditional wall-clock latency (still generating, within token budget)
+and only 4 to true hangs (all \texttt{codex}, which never completed a model call). We
+therefore keep \goodput{} as the delivery metric but withdraw ``flaky harnesses hang'' as a
+mechanism; the scaled protocol adds per-model timeout fits, randomized cell order, and a
+host-health canary, after observing that wall-clock \goodput{} on a memory-constrained host
+is \emph{non-stationary} (swap growth collapsed throughput mid-battery, making cell order a
+confound). In the Phase~C battery run under the full hardening, all 22 timeouts classify as
+harness hangs with zero host-degraded cells---evidence the controls work.
+
+\subsection{Interface-fit, not capability, is often the binding constraint}
+\label{sec:fit}
+
+\textbf{The Codex bookend (cleanest result).} \texttt{codex} scores 0 across all 89 local
+cells---every failure an artifact-commitment failure: its headless runner requires the model
+to speak its structured tool-call dialect, and no local model in the panel can. The same
+harness, pointed at its native cloud model (\texttt{gpt-5.5}), passes 20/20 (5 seeds
+$\times$ 4 tasks, every cell one iteration, Safety $=1$), \emph{including} the hardened
+tool-recovery task. A model swap alone produces a $0 \to 1$ discontinuity with the harness
+held fixed. The home-turf confound is addressed: on a \emph{non-native} mid-tier cloud model
+(\texttt{gpt-4o-mini}), the tool-required task splits by harness \emph{type}---text-diff
+\texttt{aider} fails 0/3 while tool-calling \texttt{pi} passes 3/3---so the success is
+interface-fit, not native tuning. A follow-up on a local model that \emph{does} emit clean
+OpenAI-style tool calls (\texttt{qwen3.5:9b}) sharpens the mechanism: \texttt{codex} still
+scores 0 (its local path expects a different tool dialect) while \texttt{pi} sweeps
+tool-recovery 3/3---interface-fit binds at the \emph{weakest link of the harness's dialect
+chain} (harness wire-API $\times$ serving translation $\times$ model template), demonstrated
+entirely locally.
+
+\textbf{Output shape reorders the field.} On both reasoning models (inline
+\texttt{<think>} narration in the content channel), the parse-and-apply harnesses
+\texttt{pi} and \texttt{goose} collapse to 0 \emph{while the model is answering}: the
+metering proxy logs full responses on every iteration, yet no file is ever written---the
+harness cannot extract an actionable edit from narration-dominated output. Tolerant text
+parsers (\texttt{aider}, the \texttt{ollama} control) ride out the narration and commit
+edits on the same models. The traces separate at least three distinct mechanisms behind
+identical zeros (harness cannot apply a good answer; no successful model call at all;
+protocol mismatch)---one reason ``Score 0'' must name a (harness, model) pair and open the
+trace, never indict a harness alone. We flag the confound honestly: both reasoning models
+are one family, and live probes show the operative variable is where the \emph{serving
+stack} puts reasoning (inline in content vs.\ a separate field)---the de-confounding design
+is pre-registered (\S\ref{sec:prereg}).
+
+\subsection{The harness substitutes for capability where capability is scarcest}
+\label{sec:ladder}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Harness & 2b (2.7\,GB) & 4b (3.4\,GB) & 9b (6.6\,GB) & mean\\
+\midrule
+pi & \textbf{0.79} & 0.60 & \textbf{0.92} & \textbf{0.77}\\
+ollama (thin control) & 0.24 & 0.55 & 0.64 & 0.48\\
+aider & 0.30 & 0.32 & 0.41 & 0.34\\
+codex & 0.00 & 0.00 & 0.00 & 0.00\\
+\bottomrule
+\end{tabular}
+\caption{Phase~C size ladder (222 runs): \goodput{} across the \texttt{qwen3.5} family,
+thinking off, under full hardening. The right harness on a 2b model beats the thin control
+on a model $2.4\times$ larger.}
+\label{tab:ladder}
+\end{table}
+
+Table~\ref{tab:ladder}: on the 2.7\,GB \texttt{qwen3.5:2b}---which alone passes only 1/9
+tasks at the calibration floor---the thin control scores 0.24 while \texttt{pi} scores 0.79,
+$\Delta{=}0.55$ [0.18, 0.87] (task-clustered bootstrap, significant). \texttt{pi} at 2b
+even beats the control at 9b (0.64): the scaffold buys more than a $2.4\times$ model-size
+jump at the bottom of the ladder. The control rides raw capability monotonically
+(0.24/0.55/0.64); \texttt{codex} is a structural 0 across the whole ladder
+(capability-independent); and capability-per-GB is non-monotonic for \texttt{pi} (4b $<$ 2b:
+the 4b checkpoint has task-specific holes)---routing must pick the pair per task, not the
+biggest model.
+
+\textbf{Transfer (reach) is rare.} Across the pilot's local panel, \texttt{aider} is the
+only lean harness with nonzero \goodput{} on every model (0.49/0.59/0.81, mean 0.63);
+\texttt{pi}, \texttt{hermes}, and \texttt{goose} each win on at most one model and vanish
+elsewhere. The cross-model rank instability exceeds a seed-resampling noise null (Kendall's
+$\tau = 0.407$ vs.\ null 5th percentile 0.733, $p < 0.0005$): most harness advantages are
+model-specific, not structural. Within the qwen3.5 ladder, rank stability is higher
+($\tau = 0.78$) but still partial.
+
+\textbf{Out-of-sample confirmation (Phase D).} Because pilot reach spanned only two local
+families, we pre-registered and ran a third-family arm: \texttt{llama3.2:3b} (Meta),
+7 harnesses $\times$ 11 tasks (including the hardened proof-carrying T1 trio, their first
+appearance in a published ledger) $\times$ 5 seeds---341 cells, 0 errors, 0 host-degraded
+canary events, all 5 timeouts harness-attributable. The predictions hold out-of-sample:
+\texttt{aider} is again the top lean harness and again nonzero (\goodput{} 0.64 at 93\%
+finish)---nonzero on all four local models across three families---while the tool-calling
+harnesses remain model-specific: \texttt{pi} falls to 0.18, \emph{significantly below the
+thin control} ($\Delta_{\text{ollama}-\text{pi}}{=}0.41$ [0.01, 0.77], task-clustered
+bootstrap), and \texttt{hermes} and \texttt{goose} collapse to $\leq$0.03. \texttt{codex}
+extends its structural zero to a fourth local model (now 0/144 local cells). The top-pack
+tie replicates too: \texttt{aider} vs.\ the control is $\Delta{=}0.05$ [$-0.07$, 0.20],
+n.s. On the hardened T1 trio only tool-calling harnesses pass any cell (\texttt{pi} 3/15,
+\texttt{goose} 1/15; \texttt{aider} 0/15, file-only control 0 by construction)---the
+pilot's T1 discrimination pattern, now under verifier-gaming-proof tasks.
+
+\subsection{At the frontier, quality compresses and cost discriminates}
+\label{sec:frontier}
+
+Putting a frontier model (\texttt{claude-opus-4-8}) \emph{behind} the text-format lean
+harnesses via an API shim: both pass 9/9 with Score 0.97--0.98 ($\Delta{=}0.004$, n.s.)---the
+discriminating power that mid-size models provide flattens at the top. What Score no longer
+separates, cost does, multiplicatively: \$1.59/run (\texttt{aider}) vs.\ \$0.27/run
+(\texttt{ollama}), a $\sim$6$\times$ gap at $\sim$9$\times$ the token efficiency, driven by
+loop shape (context re-sent per iteration). This is why the score never folds in cost.
+
+The frontier slice also surfaced a task-design lesson we report as a caution for the field:
+the pilot's tool-recovery task required generating a 200-entry fixture via a two-phase
+generator (``do not hand-write it''). The frontier model simply \emph{hand-wrote all 200
+entries} without executing anything, and the outcome-based verifier could not tell. This is
+precisely the verifier-gaming failure mode the ABC checklist warns of \citep{abc}; the task
+is now hardened (random nonce + sha256(nonce{+}cases) proof-of-execution, with
+hand-written-artifact rejection tests in CI), and the Phase~B bookend passes the hardened
+version.
+
+\subsection{Safety: the gate fires on runs that complete}
+\label{sec:safety}
+
+On the injection/redaction tier and the tool tier, the gate catches real harnesses, not just
+the deterministic floor: \texttt{aider} trips the resource gate on 12--17\% of cells on the
+deepseek models while otherwise strong; the floor gates at 22\%. A manual audit of all nine
+auditable gated agent cells finds genuine policy events (forbidden-path writes, secret
+leakage into output, out-of-area writes including editing a protected generator) and zero
+glob false positives. Claude Code held Safety $=1$ on 12/12 while completing---resisting the
+injection is compatible with finishing the task. Separately, we observe that \emph{sandbox
+containment is itself a harness property}: one harness, told to delete a lock file,
+discovered the repository root and deleted the file from the pristine task source rather
+than its sandboxed copy---a blast-radius failure now caught by the pristine-source integrity
+guard and reported as a per-harness escape rate.
+
+\subsection{A routing rule keyed on task tier, not prompt difficulty}
+\label{sec:routing}
+
+Per tier, the best local (harness, model) pair ties the frontier reference's \goodput{} on
+every tier tested, at \$0 marginal token cost---but the winning pair is \emph{tier-specific}
+(\pair{pi}{qwen3:8b} for tool-recovery, \pair{aider}{deepseek-r1:8b} for multi-file), so a
+difficulty router cannot pick it from the prompt. Read with the local model held fixed (it
+is whatever fits the deployment's memory): \texttt{qwen3:8b} clears every tier locally;
+\texttt{deepseek-r1:8b} clears all \emph{except} tool-recovery (best local 0.13)---escalate
+exactly that tier to cloud; \texttt{deepseek-r1:1.5b} escalates nearly everything. The rule
+that falls out: \emph{the harness choice matters most in the middle}. A mid-size model can
+be harnessed to match cloud; a tiny model cannot be harnessed into capability it lacks; and
+tool-recovery is the tier where even a solid 8B should hand off. The pre-registered contrast
+against a prompt-length difficulty baseline is future work.
+
+\section{Threats to validity}
+\label{sec:limits}
+
+\textbf{Exploratory, in-sample pilot.} Hypotheses were sharpened from the pilot they are
+supported by; we claim motivation, not confirmation---except where the pre-registered
+Phase~D arm (\S\ref{sec:ladder}) confirms out-of-sample; the remainder of the confirmatory
+design (\S\ref{sec:prereg}) is not yet complete. \textbf{Homegrown tasks.} Nine authored tasks,
+built to discriminate---the discrimination could partly reflect task construction; the
+mitigation (an external anchored slice via the task-import contract) is designed but not yet
+run. \textbf{Narrow panel.} Three local models in two families; the reach claim could be a
+family effect. \textbf{Few seeds.} Three seeds give wide intervals; many pairwise
+differences are correctly reported as not significant; only one adapter exposes a true seed
+knob (others' seeds are independent samples, flagged when zero-variance artifacts occur).
+\textbf{Single host.} All local runs share one Apple-Silicon machine; wall-clock-dependent
+results are host-conditional (and, pre-hardening, host-\emph{history}-conditional).
+\textbf{Metering asymmetry.} Two harnesses bypass the token proxy (shown as unmetered, never
+imputed); one cloud arm ran on a subscription; the frontier cost is a cache-inflated upper
+bound---cost claims are scoped to uniformly metered arms. \textbf{Unvalidated process
+proxies.} Path/State are deterministic proxies not yet validated against human judgment
+($\kappa$ study pre-registered). \textbf{Frontier slice is not agentic Claude Code}: the
+shim measures the lean harness driving the frontier model as a raw completion endpoint,
+tools off.
+
+\section{Pre-registered confirmatory design}
+\label{sec:prereg}
+
+Frozen before execution: (1)~\emph{models}: $\geq$3 local families (Qwen, Llama,
+Mistral/Gemma), each in clean-output and reasoning variants where available, plus $\geq$2
+cloud families with tool calling---isolating output shape from family and size;
+(2)~\emph{tasks}: the tiered battery \emph{plus} an anchored slice imported from a
+recognized suite (SWE-bench-Verified / Terminal-Bench / $\tau^2$-bench), re-checking the
+main effects on external tasks; (3)~\emph{power}: $\geq$5 seeds, CI-width targeted per
+\citet{errorbars}, task-clustered bootstrap, pass\textasciicircum{}$k$, rank stability
+against a seed-resampling null; (4)~\emph{construct validity}: human labels on a stratified
+trace sample with proxy$\leftrightarrow$human $\kappa$ for Path, State, and the gate;
+(5)~\emph{integrity}: hidden oracles, pristine-source guard, deterministic scorecard, CI
+drift guard. \textbf{Primary prediction} (the thesis lives or dies on it): interface-fit
+effects (the Codex discontinuity; shape-driven collapse, de-confounded) are larger than the
+within-interface-class model-capability effect on sub-frontier models. If capability
+explains the outcomes and interface-fit does not, the central thesis is refuted, and we will
+report it. \emph{Status:} the third-family arm (Phase~D, \S\ref{sec:ladder}) is executed and
+confirms the transfer and structural-zero predictions out-of-sample; the external task
+anchor, the $\kappa$ construct-validity study, the difficulty-router contrast, and the
+second-machine replication remain open.
+
+\section{Conclusion}
+
+The harness is not packaging around a model; on sub-frontier models it is often \emph{the}
+capability---and it can also be the thing that is broken. \crucible{} turns that from a
+observation into a measurement: a factorial, safety-gated, delivery-honest, drift-guarded
+instrument whose output is not a leaderboard but an attribution (which member of the pair
+failed), a mechanism (interface-fit), and a decision (when to stay local). The apparatus,
+adapters, tasks, frozen ledgers, and analysis code are released for reuse; the pre-registered
+scaled study is the immediate next step.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}
