@@ -335,7 +335,7 @@ if (phaseD) {
   const clean = rs => rs.filter(r => !r.timed_out && r.result === 'passed' && (r.score ?? 0) >= 0.9).length;
   claim('Phase D hardened T1: pi 3/15 clean (5 passes, 2 gated), goose 1/15; text/file harnesses 0',
     t1('pi').length === 15 && clean(t1('pi')) === 3 && passes(t1('pi')) === 5 &&
-    clean(t1('goose')) === 1 &&
+    t1('goose').length === 15 && clean(t1('goose')) === 1 &&
     ['aider', 'ollama', 'hermes', 'codex'].every(a => passes(t1(a)) === 0),
     `pi clean=${clean(t1('pi'))}/passes=${passes(t1('pi'))} goose=${clean(t1('goose'))} ` +
     `others=${['aider', 'ollama', 'hermes', 'codex'].map(a => passes(t1(a))).join('/')}`);

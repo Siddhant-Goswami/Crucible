@@ -404,9 +404,10 @@ timeout fits + seeded cell-shuffle + health canary). Goodput by harness × model
 
 The reach/transfer claims (H2, H3a) were pilot-supported on only **2 local families**; the
 pre-registered design (hypotheses §5.1) demanded ≥3. Phase D ran the third:
-**`llama3.2:3b`** (Meta/Llama) × 7 harnesses × **11 tasks** (the full battery **plus the
-hardened proof-carrying T1 trio** — their first appearance in a published ledger) ×
-**5 seeds** = **341 cells** (`phase-d-llama.jsonl`), under the full §5A hardening (per-model
+**`llama3.2:3b`** (Meta/Llama) × 6 LLM harnesses × **11 tasks** (the full battery **plus
+the hardened proof-carrying T1 trio** — their first appearance in a published ledger) ×
+**5 seeds** (330), plus the deterministic `mock` harness × 11 tasks × 1 seed (11) =
+**341 cells** (`phase-d-llama.jsonl`), under the full §5A hardening (per-model
 timeout fit 30s, seeded shuffle `ORDER_SEED=42`, health canary). Ledger quality: 0 errors,
 **0 HOST_DEGRADED canary events** (330 probes), 5 timeouts — all harness-attributable
 (4 `aider`, 1 `goose`).

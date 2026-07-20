@@ -366,8 +366,9 @@ model-specific, not structural. Within the qwen3.5 ladder, rank stability is hig
 
 \textbf{Out-of-sample confirmation (Phase D).} Because pilot reach spanned only two local
 families, we pre-registered and ran a third-family arm: \texttt{llama3.2:3b} (Meta),
-7 harnesses $\times$ 11 tasks (including the hardened proof-carrying T1 trio, their first
-appearance in a published ledger) $\times$ 5 seeds---341 cells, 0 errors, 0 host-degraded
+6 LLM harnesses $\times$ 11 tasks (including the hardened proof-carrying T1 trio, their
+first appearance in a published ledger) $\times$ 5 seeds, plus the deterministic
+\texttt{mock} harness $\times$ 11 tasks $\times$ 1 seed---341 cells, 0 errors, 0 host-degraded
 canary events, all 5 timeouts harness-attributable. The predictions hold out-of-sample:
 \texttt{aider} is again the top lean harness and again nonzero (\goodput{} 0.64 at 93\%
 finish)---nonzero on all four local models across three families---while the tool-calling

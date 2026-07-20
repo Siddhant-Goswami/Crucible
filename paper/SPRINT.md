@@ -13,7 +13,8 @@
 - All 16 bibliography arXiv IDs verified against the arXiv API 2026-07-18 (see provenance
   note in `docs/crucible-related-work.md`).
 - **Phase D confirmatory arm is DONE and folded in**: `llama3.2:3b` (3rd local family) ×
-  7 harnesses × 11 tasks (incl. hardened T1 trio) × 5 seeds = 341 cells, 0 errors,
+  6 LLM harnesses × 11 tasks (incl. hardened T1 trio) × 5 seeds (330) + deterministic
+  `mock` × 11 tasks × 1 seed (11) = 341 cells, 0 errors,
   0 HOST_DEGRADED. Ledger frozen at `crucible/results/phase-d-llama.jsonl`; scorecard
   `SCORECARD-phase-d-llama.md`; writeup `docs/crucible-results.md` §6.8. Headlines: aider
   0.64 (top lean, nonzero on 4th model/3rd family); pi 0.18 (significantly below thin
