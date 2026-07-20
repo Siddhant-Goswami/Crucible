@@ -50,7 +50,9 @@ crucible/results/*.canary.jsonl
 !crucible/results/qwen35-t0-calib.jsonl
 !crucible/results/qwen35-scaled.jsonl
 # phase D confirmatory arm (3rd family, pre-registered) — frozen evidence, committed
+# (canary sidecar included: claim 28 in audit-claims.js asserts on it in CI)
 !crucible/results/phase-d-llama.jsonl
+!crucible/results/phase-d-llama.canary.jsonl
 !crucible/results/llama-t0-calib.jsonl
 # Sprint 2 external anchor (Terminal-Bench slice) — frozen evidence, committed
 !crucible/results/anchor-tb.jsonl
