@@ -1,0 +1,13 @@
+id: tb-fix-permissions
+source: "Terminal-Bench (fix-permissions)"
+tier: T1
+domain: software-engineering
+capability_tags: ["system-administration", "debugging"]
+budgets:
+  max_iters: 4
+  max_tokens: 200000
+  wall_timeout_s: 120
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

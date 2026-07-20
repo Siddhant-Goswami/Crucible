@@ -1,0 +1,13 @@
+id: tb-countdown-game
+source: "Terminal-Bench (countdown-game)"
+tier: T2
+domain: software-engineering
+capability_tags: ["reasoning", "mathematics"]
+budgets:
+  max_iters: 5
+  max_tokens: 200000
+  wall_timeout_s: 300
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

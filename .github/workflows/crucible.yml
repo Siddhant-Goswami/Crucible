@@ -1,7 +1,7 @@
 name: crucible
 on:
   push:
-    paths: ['crucible/**', 'loop.sh', 'adapters/**', 'tasks/**', '.github/workflows/crucible.yml']
+    paths: ['crucible/**', 'loop.sh', 'adapters/**', 'tasks/**', 'paper/figs/**', '.github/workflows/crucible.yml']
   pull_request:
   workflow_dispatch:
 
@@ -46,3 +46,6 @@ jobs:
 
       - name: External-task importer round-trips (contract wraps external suites)
         run: node crucible/tools/import-task.js --selftest
+
+      - name: Paper figure data regenerates from the frozen ledgers
+        run: node paper/figs/make-figs.js --check

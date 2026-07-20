@@ -248,6 +248,142 @@ if (scaled) {
     codexGP, `2b/4b/9b codex goodput = ${['qwen3.5:2b','qwen3.5:4b','qwen3.5:9b'].map(m => gp('codex', m).toFixed(2)).join('/')}`);
 }
 
+// --- Phase D third-family confirmatory arm (results §6.8) — asserted only if the ledger exists ---
+// A deterministic task-clustered bootstrap (same method + seed as tools/clustered-stats.js):
+// resample TASK clusters, take all their (task, seed)-paired goodput deltas. Seeded mulberry32,
+// fresh per comparison, so the CI endpoints are exactly reproducible — the doc quotes THESE numbers.
+const mulberry32 = a => () => {
+  a |= 0; a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+const clusteredDelta = (ledger, a, b, B = 10000) => {
+  const rnd = mulberry32(20260702), choice = arr => arr[Math.floor(rnd() * arr.length)];
+  const mean = v => v.reduce((s, x) => s + x, 0) / v.length;
+  const gp = r => r.timed_out ? 0 : (r.score ?? 0);
+  const byKey = {};
+  for (const r of ledger) {
+    if (r.adapter !== a && r.adapter !== b) continue;
+    const k = r.task + '|' + r.seed;
+    (byKey[k] = byKey[k] || {})[r.adapter] = gp(r);
+  }
+  const pairs = Object.entries(byKey)
+    .filter(([, v]) => v[a] !== undefined && v[b] !== undefined)
+    .map(([k, v]) => ({ task: k.split('|')[0], d: v[a] - v[b] }));
+  const tasks = [...new Set(pairs.map(p => p.task))];
+  const byTask = {};
+  pairs.forEach(p => (byTask[p.task] = byTask[p.task] || []).push(p.d));
+  const boot = [];
+  for (let i = 0; i < B; i++) {
+    const ds = [];
+    for (let j = 0; j < tasks.length; j++) ds.push(...byTask[choice(tasks)]);
+    boot.push(mean(ds));
+  }
+  boot.sort((x, y) => x - y);
+  const pct = p => boot[Math.min(boot.length - 1, Math.floor(p * boot.length))];
+  return { delta: mean(pairs.map(p => p.d)), lo: pct(0.025), hi: pct(0.975), n: pairs.length, clusters: tasks.length };
+};
+const phaseD = loadLedger('phase-d-llama.jsonl');
+if (phaseD) {
+  const of = a => phaseD.filter(r => r.adapter === a);
+  const r2 = x => Math.round(x * 100) / 100;
+  // 27. Ledger census: 341 cells, 0 error rows, 5 timeouts — all harness-attributable (4 aider, 1 goose).
+  const toBy = phaseD.filter(r => r.timed_out).reduce((m, r) => (m[r.adapter] = (m[r.adapter] || 0) + 1, m), {});
+  claim('Phase D census: 341 rows, 0 errors, 5 timeouts = 4 aider + 1 goose (harness-attributable)',
+    phaseD.length === 341 && phaseD.every(r => !r.error) && timeouts(phaseD) === 5 &&
+    toBy.aider === 4 && toBy.goose === 1 && Object.keys(toBy).length === 2,
+    `n=${phaseD.length} TO=${timeouts(phaseD)} by=${JSON.stringify(toBy)}`);
+  // 28. Host-health canary: 330 probes, ZERO unhealthy (no unload_reprobe) — 0 HOST_DEGRADED events,
+  //     so every Phase D timeout is the harness's, not the host's.
+  const canary = loadLedger('phase-d-llama.canary.jsonl');
+  const probes = (canary || []).filter(r => r.cell);
+  claim('Phase D canary: 330 probes, 0 HOST_DEGRADED (no unhealthy probe, no null rate)',
+    !!canary && probes.length === 330 && probes.every(r => !r.action && r.tok_s != null),
+    canary ? `probes=${probes.length} unhealthy=${probes.filter(r => r.action).length}` : 'canary sidecar MISSING');
+  // 29. H2 out-of-sample: aider again tops the lean field — Goodput 0.64 at 93% finish, nonzero on a
+  //     4th local model / 3rd family.
+  claim('Phase D: aider Goodput 0.64 at 93% finish (top lean harness, 3rd family nonzero)',
+    r2(goodput(of('aider'))) === 0.64 && Math.round(relPct(of('aider'))) === 93,
+    `goodput=${goodput(of('aider')).toFixed(3)} rel=${relPct(of('aider')).toFixed(1)}%`);
+  // 30. Tool-callers stay model-specific: pi falls to 0.18, SIGNIFICANTLY below the thin control —
+  //     task-clustered Δ(ollama−pi)=0.41 [0.01, 0.75], CI excludes 0.
+  const dOP = clusteredDelta(phaseD, 'ollama', 'pi');
+  claim('Phase D: pi 0.18, below thin control — Δ(ollama−pi)=0.41 [0.01, 0.75] clustered, CI excl. 0',
+    r2(goodput(of('pi'))) === 0.18 && r2(goodput(of('ollama'))) === 0.58 &&
+    r2(dOP.delta) === 0.41 && r2(dOP.lo) === 0.01 && r2(dOP.hi) === 0.75 && dOP.lo > 0,
+    `pi=${goodput(of('pi')).toFixed(3)} ollama=${goodput(of('ollama')).toFixed(3)} ` +
+    `Δ=${dOP.delta.toFixed(3)} [${dOP.lo.toFixed(3)}, ${dOP.hi.toFixed(3)}] n=${dOP.n}/${dOP.clusters} clusters`);
+  // 31. Top-pack tie replicates: aider vs ollama Δ=0.05 [−0.04, 0.17], n.s. (CI includes 0).
+  const dAO = clusteredDelta(phaseD, 'aider', 'ollama');
+  claim('Phase D: aider vs ollama tie replicates — Δ=0.05 [−0.04, 0.17] clustered, n.s.',
+    r2(dAO.delta) === 0.05 && r2(dAO.lo) === -0.04 && r2(dAO.hi) === 0.17 && dAO.lo < 0 && dAO.hi > 0,
+    `Δ=${dAO.delta.toFixed(3)} [${dAO.lo.toFixed(3)}, ${dAO.hi.toFixed(3)}]`);
+  // 32. H3a on a 4th local model: codex is a structural 0 on all 55 Phase D cells (0/144 cumulative).
+  claim('Phase D: codex 0/55 — structural zero extends to a 4th local model / 3rd family',
+    of('codex').length === 55 && passes(of('codex')) === 0 && goodput(of('codex')) === 0,
+    `n=${of('codex').length} passes=${passes(of('codex'))} goodput=${goodput(of('codex')).toFixed(2)}`);
+  // 33. The other tool-callers collapse on llama: hermes 0.00, goose 0.03 (2dp, as the scorecard rounds).
+  claim('Phase D: hermes 0.00 and goose ≤0.03 (tool-callers are model-specific)',
+    r2(goodput(of('hermes'))) === 0 && r2(goodput(of('goose'))) <= 0.03,
+    `hermes=${goodput(of('hermes')).toFixed(4)} goose=${goodput(of('goose')).toFixed(3)}`);
+  // 34. Hardened T1 trio discriminates as designed: only tool-calling harnesses pass any cell.
+  //     pi: 5 verifier passes, exactly 3 clean (score ≥ 0.9; the other 2 are safety-gated).
+  //     goose 1/15 clean; aider, ollama, hermes, codex all 0.
+  const T1 = ['tool-recover', 'tool-recover-config', 'tool-recover-lock'];
+  const t1 = a => of(a).filter(r => T1.includes(r.task));
+  const clean = rs => rs.filter(r => !r.timed_out && r.result === 'passed' && (r.score ?? 0) >= 0.9).length;
+  claim('Phase D hardened T1: pi 3/15 clean (5 passes, 2 gated), goose 1/15; text/file harnesses 0',
+    t1('pi').length === 15 && clean(t1('pi')) === 3 && passes(t1('pi')) === 5 &&
+    t1('goose').length === 15 && clean(t1('goose')) === 1 &&
+    ['aider', 'ollama', 'hermes', 'codex'].every(a => passes(t1(a)) === 0),
+    `pi clean=${clean(t1('pi'))}/passes=${passes(t1('pi'))} goose=${clean(t1('goose'))} ` +
+    `others=${['aider', 'ollama', 'hermes', 'codex'].map(a => passes(t1(a))).join('/')}`);
+}
+
+// --- Sprint 2 external anchor: the Terminal-Bench slice (results §6.9) ---------------------------
+// Asserted only if the anchor ledger exists. The frozen ledger is committed, so these are exact.
+const anchor = loadLedger('anchor-tb.jsonl');
+if (anchor) {
+  const aof = a => anchor.filter(r => r.adapter === a);
+  const agp = rs => rs.length ? rs.reduce((s, r) => s + (r.timed_out ? 0 : (r.score ?? 0)), 0) / rs.length : 0;
+  const apass = rs => rs.filter(r => !r.timed_out && r.result === 'passed').length;
+  const r2 = x => Math.round(x * 100) / 100;
+  // 35. Census: 370 cells (7 harnesses × 2 models × 10 tasks + 10 mock), 24 passes, 90 timeouts.
+  claim('Anchor census: 370 cells, 24 passes, 90 timeouts (external Terminal-Bench slice)',
+    anchor.length === 370 && anchor.filter(r => r.result === 'passed').length === 24 && timeouts(anchor) === 90,
+    `n=${anchor.length} passes=${anchor.filter(r => r.result === 'passed').length} TO=${timeouts(anchor)}`);
+  // 36. H3a reproduces out-of-distribution: codex is a structural 0 on the external tasks (0/60,
+  //     Goodput 0), and the other non-fitting tool-caller hermes is ~0 too (0/60, Goodput→0.00).
+  claim('Anchor H3a: codex 0/60 Goodput 0, hermes 0/60 Goodput 0.00 (interface-fit not a homegrown artifact)',
+    aof('codex').length === 60 && apass(aof('codex')) === 0 && agp(aof('codex')) === 0 &&
+    aof('hermes').length === 60 && apass(aof('hermes')) === 0 && r2(agp(aof('hermes'))) === 0,
+    `codex ${apass(aof('codex'))}/60 gp=${agp(aof('codex')).toFixed(3)} | hermes ${apass(aof('hermes'))}/60 gp=${agp(aof('hermes')).toFixed(4)}`);
+  // 37. "The harness is the capability" transfers: the lean harnesses lead the field externally —
+  //     pi tops mean Goodput (0.19) above aider (0.13) and the thin ollama control (0.11), and every
+  //     tool-caller (codex 0, hermes 0, goose ≤0.02) sits below them.
+  const piGP = agp(aof('pi')), aiderGP = agp(aof('aider')), ollamaGP = agp(aof('ollama')), gooseGP = agp(aof('goose'));
+  claim('Anchor reach: pi 0.19 > aider 0.13 > ollama 0.11 > tool-callers (goose ≤0.02, hermes/codex 0)',
+    r2(piGP) === 0.19 && r2(aiderGP) === 0.13 && r2(ollamaGP) === 0.11 &&
+    piGP > aiderGP && aiderGP > ollamaGP && ollamaGP > gooseGP && r2(gooseGP) <= 0.02,
+    `pi=${piGP.toFixed(3)} aider=${aiderGP.toFixed(3)} ollama=${ollamaGP.toFixed(3)} goose=${gooseGP.toFixed(3)}`);
+  // 38. Honest underpower: with only 10 external tasks the task-clustered Δ(pi−ollama) point estimate
+  //     is positive on both models but its CI INCLUDES 0 — the direction transfers, significance does
+  //     not (yet). (Same clustered-bootstrap method + seed as the Phase D deltas.)
+  const dq = clusteredDelta(anchor.filter(r => r.model === 'qwen3.5:9b'), 'pi', 'ollama');
+  claim('Anchor Δ(pi−ollama) qwen3.5:9b = 0.10 [−0.03, 0.28] clustered — positive but CI incl. 0 (n.s., underpowered)',
+    r2(dq.delta) === 0.1 && r2(dq.lo) === -0.03 && r2(dq.hi) === 0.28 && dq.lo < 0 && dq.hi > 0,
+    `Δ=${dq.delta.toFixed(3)} [${dq.lo.toFixed(3)}, ${dq.hi.toFixed(3)}] n=${dq.n}/${dq.clusters} clusters`);
+  // 39. External tasks are hard for small local models: all 24 passes fall on the two trivial tasks
+  //     (hello-world, fix-permissions) plus a single jsonl-aggregator cell — 0 passes on the other
+  //     seven tasks. So the homegrown battery's discrimination is not merely task construction, and
+  //     T2+ external work must escalate to cloud.
+  const passTasks = [...new Set(anchor.filter(r => !r.timed_out && r.result === 'passed').map(r => r.task))].sort();
+  claim('Anchor difficulty: passes only on {tb-hello-world, tb-fix-permissions, tb-jsonl-aggregator}; 0 on the other 7',
+    JSON.stringify(passTasks) === JSON.stringify(['tb-fix-permissions', 'tb-hello-world', 'tb-jsonl-aggregator']),
+    passTasks.join(', ') || '(none)');
+}
+
 // --- report -------------------------------------------------------------------
 let failed = 0;
 console.log(`\nCrucible claims audit — ${rows.length} runs from ${path.relative(path.join(__dirname, '..'), LEDGER)}\n`);

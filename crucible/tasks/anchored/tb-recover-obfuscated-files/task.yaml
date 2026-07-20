@@ -1,0 +1,13 @@
+id: tb-recover-obfuscated-files
+source: "Terminal-Bench (recover-obfuscated-files)"
+tier: T2
+domain: software-engineering
+capability_tags: ["security", "file-operations"]
+budgets:
+  max_iters: 5
+  max_tokens: 200000
+  wall_timeout_s: 240
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

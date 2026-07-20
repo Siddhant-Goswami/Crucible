@@ -1,0 +1,13 @@
+id: tb-recover-accuracy-log
+source: "Terminal-Bench (recover-accuracy-log)"
+tier: T3
+domain: software-engineering
+capability_tags: ["data-processing", "reasoning"]
+budgets:
+  max_iters: 5
+  max_tokens: 200000
+  wall_timeout_s: 360
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

@@ -1,0 +1,13 @@
+id: tb-schemelike-metacircular-eval
+source: "Terminal-Bench (schemelike-metacircular-eval)"
+tier: T4
+domain: software-engineering
+capability_tags: ["software-engineering", "interpreters"]
+budgets:
+  max_iters: 4
+  max_tokens: 200000
+  wall_timeout_s: 480
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]

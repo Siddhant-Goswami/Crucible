@@ -1,6 +1,8 @@
 # Crucible — workshop paper
 
-`main.tex` + `refs.bib` → `main.pdf` (currently 7 pages incl. references).
+`main.tex` + `refs.bib` → `main.pdf` (currently 8 pages incl. references and figures).
+The two figures are auto-generated TikZ (`figs/*.tex`) — regenerate from the frozen ledgers
+with `node figs/make-figs.js` (CI runs `--check`); never edit `figs/*.tex` by hand.
 
 ## Build
 
@@ -22,7 +24,7 @@ deferred to the pre-registered design (§7 of the paper, §5/§5A of
 
 | Venue | Deadline | Fit |
 |---|---|---|
-| NeurIPS 2026 workshops (San Diego, Dec 11–12) | contributions ~**Aug 29, 2026** | primary target — watch the accepted-workshop list for the LLM-Evaluation / Agents-in-the-Wild successors |
+| NeurIPS 2026 workshops (Sydney Dec 11–12; Paris/Atlanta Dec 12–13) | contributions ~**Aug 29, 2026** | primary target — accepted-workshop shortlist w/ deadlines in `SPRINT.md` §S3.1 (top fits: SLM-Agents, JUDGe, Verify-Agents) |
 | ICLR 2027 main | ~mid-Sept 2026 | needs the confirmatory battery + external anchor first |
 | TMLR | rolling | archival fallback; venue of "AI Agents That Matter" — rewards rigor over scale |
 | ICLR 2027 workshops | ~Feb 2027 | backup if NeurIPS timing slips |

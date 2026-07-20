@@ -13,6 +13,13 @@
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+% figure palette (Okabe–Ito, colorblind-safe; validated) — used by figs/*.tex
+\definecolor{figblue}{HTML}{0072B2}
+\definecolor{figvermilion}{HTML}{D55E00}
+\definecolor{figgreen}{HTML}{009E73}
+\definecolor{figpink}{HTML}{CC79A7}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
 \usepackage{enumitem}
@@ -179,8 +186,8 @@ nonce{+}sha256 proof-of-execution after a frontier model hand-wrote the fixture,
 \S\ref{sec:frontier}); T2 multi-file consistency (regressions ding State); T3 artifact
 generation with sourcing requirements; T4 safety---a prompt-injection/secret-redaction task
 where leaking the secret zeroes the score even on a completed run. Tasks are discriminating
-\emph{by design}; external anchoring is future work (\S\ref{sec:prereg}) via a task-import
-contract that wraps external suites.
+\emph{by design}; a task-import contract wraps external suites, and a first anchored slice from
+Terminal-Bench (\S\ref{sec:anchor}) reproduces the structural orderings out-of-distribution.
 
 \textbf{Panel.} Harnesses: \texttt{claude} (Claude Code, frontier reference), \texttt{aider}
 (repo-map, diff-driven), \texttt{codex} (OpenAI Codex CLI, structured tool protocol),
@@ -192,7 +199,7 @@ Local models: \texttt{deepseek-r1:1.5b}, \texttt{deepseek-r1:8b} (reasoning, inl
 harnesses (via an API shim), plus metered OpenAI arms.
 
 \textbf{Integrity.} Every published number regenerates from committed JSONL ledgers; a CI
-guard recomputes $\sim$20 pinned claims from the frozen ledger and fails the build on drift.
+guard recomputes 36 pinned claims from the frozen ledgers and fails the build on drift.
 Runs are sandboxed into throwaway copies; a pristine-source guard restores each task from git
 before every cell and logs sandbox escapes (it fired twice in production, catching a harness
 deleting a file from the pristine task source). Cells are killed at a per-(model, host)
@@ -265,12 +272,33 @@ harness hangs with zero host-degraded cells---evidence the controls work.
 \subsection{Interface-fit, not capability, is often the binding constraint}
 \label{sec:fit}
 
+\begin{figure}[t]
+\centering
+\begin{minipage}[t]{0.48\linewidth}
+\centering
+\input{figs/codex-bookend}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\centering
+\input{figs/ladder}
+\end{minipage}
+\caption{\textbf{(left)} The interface-fit discontinuity: \texttt{codex} pass rate over
+finished cells, per model---0/144 across five local models in three families (the qwen3.5
+size ladder adds 54 further zero cells not in this census) versus 20/20 on its native cloud
+model, with the harness held fixed. \textbf{(right)} Phase~C size ladder: \goodput{} across
+the \texttt{qwen3.5} family (thinking off, full hardening). The \texttt{pi} harness on the
+2.7\,GB model beats the thin control on a model $2.4\times$ larger; \texttt{codex} is flat
+at 0 at every size. Both panels regenerate from the committed run ledgers
+(\texttt{paper/figs/make-figs.js}).}
+\label{fig:bookend}
+\end{figure}
+
 \textbf{The Codex bookend (cleanest result).} \texttt{codex} scores 0 across all 89 local
 cells---every failure an artifact-commitment failure: its headless runner requires the model
 to speak its structured tool-call dialect, and no local model in the panel can. The same
 harness, pointed at its native cloud model (\texttt{gpt-5.5}), passes 20/20 (5 seeds
 $\times$ 4 tasks, every cell one iteration, Safety $=1$), \emph{including} the hardened
-tool-recovery task. A model swap alone produces a $0 \to 1$ discontinuity with the harness
+tool-recovery task (Figure~\ref{fig:bookend}, left). A model swap alone produces a $0 \to 1$ discontinuity with the harness
 held fixed. The home-turf confound is addressed: on a \emph{non-native} mid-tier cloud model
 (\texttt{gpt-4o-mini}), the tool-required task splits by harness \emph{type}---text-diff
 \texttt{aider} fails 0/3 while tool-calling \texttt{pi} passes 3/3---so the success is
@@ -317,7 +345,8 @@ on a model $2.4\times$ larger.}
 \label{tab:ladder}
 \end{table}
 
-Table~\ref{tab:ladder}: on the 2.7\,GB \texttt{qwen3.5:2b}---which alone passes only 1/9
+Table~\ref{tab:ladder} (drawn as curves in Figure~\ref{fig:bookend}, right): on the
+2.7\,GB \texttt{qwen3.5:2b}---which alone passes only 1/9
 tasks at the calibration floor---the thin control scores 0.24 while \texttt{pi} scores 0.79,
 $\Delta{=}0.55$ [0.18, 0.87] (task-clustered bootstrap, significant). \texttt{pi} at 2b
 even beats the control at 9b (0.64): the scaffold buys more than a $2.4\times$ model-size
@@ -337,19 +366,37 @@ model-specific, not structural. Within the qwen3.5 ladder, rank stability is hig
 
 \textbf{Out-of-sample confirmation (Phase D).} Because pilot reach spanned only two local
 families, we pre-registered and ran a third-family arm: \texttt{llama3.2:3b} (Meta),
-7 harnesses $\times$ 11 tasks (including the hardened proof-carrying T1 trio, their first
-appearance in a published ledger) $\times$ 5 seeds---341 cells, 0 errors, 0 host-degraded
+6 LLM harnesses $\times$ 11 tasks (including the hardened proof-carrying T1 trio, their
+first appearance in a published ledger) $\times$ 5 seeds, plus the deterministic
+\texttt{mock} harness $\times$ 11 tasks $\times$ 1 seed---341 cells, 0 errors, 0 host-degraded
 canary events, all 5 timeouts harness-attributable. The predictions hold out-of-sample:
 \texttt{aider} is again the top lean harness and again nonzero (\goodput{} 0.64 at 93\%
 finish)---nonzero on all four local models across three families---while the tool-calling
 harnesses remain model-specific: \texttt{pi} falls to 0.18, \emph{significantly below the
-thin control} ($\Delta_{\text{ollama}-\text{pi}}{=}0.41$ [0.01, 0.77], task-clustered
+thin control} ($\Delta_{\text{ollama}-\text{pi}}{=}0.41$ [0.01, 0.75], task-clustered
 bootstrap), and \texttt{hermes} and \texttt{goose} collapse to $\leq$0.03. \texttt{codex}
-extends its structural zero to a fourth local model (now 0/144 local cells). The top-pack
-tie replicates too: \texttt{aider} vs.\ the control is $\Delta{=}0.05$ [$-0.07$, 0.20],
-n.s. On the hardened T1 trio only tool-calling harnesses pass any cell (\texttt{pi} 3/15,
-\texttt{goose} 1/15; \texttt{aider} 0/15, file-only control 0 by construction)---the
+extends its structural zero to a fourth local model (now 0/144 local cells;
+Figure~\ref{fig:bookend}). The top-pack
+tie replicates too: \texttt{aider} vs.\ the control is $\Delta{=}0.05$ [$-0.04$, 0.17],
+n.s. On the hardened T1 trio only tool-calling harnesses pass any cell (\texttt{pi} 3/15
+clean plus two safety-gated passes, \texttt{goose} 1/15; \texttt{aider} 0/15, file-only
+control 0 by construction)---the
 pilot's T1 discrimination pattern, now under verifier-gaming-proof tasks.
+
+\textbf{External anchor (Terminal-Bench slice).}\label{sec:anchor} The largest validity gap is
+that the battery is authored, so its discrimination could reflect task construction. As a first
+mitigation we imported 10 Terminal-Bench tasks (commit \texttt{d28711d}) through the same task
+contract---a hidden, base64-embedded oracle per task, each self-validated to discriminate (pristine
+seed fails, reference solution passes)---and ran the 7 harnesses $\times$
+\{\texttt{qwen3.5:9b}, \texttt{llama3.2:3b}\} $\times$ 3 seeds (370 cells) under the same hardening.
+The structural orderings reproduce out-of-distribution: \texttt{codex} is again a structural 0
+(0/60) and \texttt{hermes} 0/60, while the lean text harnesses lead (\texttt{pi} \goodput{}
+0.19 $>$ \texttt{aider} 0.13 $>$ thin control 0.11). With only 10 external tasks the contrast is
+underpowered---$\Delta_{\text{pi}-\text{ollama}}{=}0.10$ [$-0.03$, 0.28], task-clustered, CI
+includes 0---so the direction transfers but significance does not yet. The tasks are also hard for
+these sub-frontier local models (24/370 pass, all on the two trivial tiers), which is itself
+evidence that the homegrown discrimination is not \emph{merely} construction. The full external
+anchor remains future work.
 
 \subsection{At the frontier, quality compresses and cost discriminates}
 \label{sec:frontier}
@@ -407,9 +454,10 @@ against a prompt-length difficulty baseline is future work.
 supported by; we claim motivation, not confirmation---except where the pre-registered
 Phase~D arm (\S\ref{sec:ladder}) confirms out-of-sample; the remainder of the confirmatory
 design (\S\ref{sec:prereg}) is not yet complete. \textbf{Homegrown tasks.} Nine authored tasks,
-built to discriminate---the discrimination could partly reflect task construction; the
-mitigation (an external anchored slice via the task-import contract) is designed but not yet
-run. \textbf{Narrow panel.} Three local models in two families; the reach claim could be a
+built to discriminate---the discrimination could partly reflect task construction; a first
+external anchored slice (10 Terminal-Bench tasks, \S\ref{sec:anchor}) is executed and reproduces
+the structural orderings out-of-distribution, but is itself underpowered (10 tasks) and the full
+anchor remains future work. \textbf{Narrow panel.} Three local models in two families; the reach claim could be a
 family effect. \textbf{Few seeds.} Three seeds give wide intervals; many pairwise
 differences are correctly reported as not significant; only one adapter exposes a true seed
 knob (others' seeds are independent samples, flagged when zero-variance artifacts occur).
@@ -441,9 +489,10 @@ effects (the Codex discontinuity; shape-driven collapse, de-confounded) are larg
 within-interface-class model-capability effect on sub-frontier models. If capability
 explains the outcomes and interface-fit does not, the central thesis is refuted, and we will
 report it. \emph{Status:} the third-family arm (Phase~D, \S\ref{sec:ladder}) is executed and
-confirms the transfer and structural-zero predictions out-of-sample; the external task
-anchor, the $\kappa$ construct-validity study, the difficulty-router contrast, and the
-second-machine replication remain open.
+confirms the transfer and structural-zero predictions out-of-sample, and a first external-task
+anchor (10 Terminal-Bench tasks, \S\ref{sec:anchor}) reproduces the structural orderings though it
+is underpowered; the full anchor, the $\kappa$ construct-validity study, the difficulty-router
+contrast, and the second-machine replication remain open.
 
 \section{Conclusion}
 

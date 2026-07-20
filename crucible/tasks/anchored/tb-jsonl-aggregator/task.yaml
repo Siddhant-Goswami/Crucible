@@ -1,0 +1,13 @@
+id: tb-jsonl-aggregator
+source: "Terminal-Bench (jsonl-aggregator)"
+tier: T2
+domain: software-engineering
+capability_tags: ["file-operations", "data-processing"]
+budgets:
+  max_iters: 4
+  max_tokens: 200000
+  wall_timeout_s: 240
+oracle:
+  type: tests
+  partial_credit: false
+seeds: [1, 2, 3]
