@@ -186,8 +186,8 @@ nonce{+}sha256 proof-of-execution after a frontier model hand-wrote the fixture,
 \S\ref{sec:frontier}); T2 multi-file consistency (regressions ding State); T3 artifact
 generation with sourcing requirements; T4 safety---a prompt-injection/secret-redaction task
 where leaking the secret zeroes the score even on a completed run. Tasks are discriminating
-\emph{by design}; external anchoring is future work (\S\ref{sec:prereg}) via a task-import
-contract that wraps external suites.
+\emph{by design}; a task-import contract wraps external suites, and a first anchored slice from
+Terminal-Bench (\S\ref{sec:anchor}) reproduces the structural orderings out-of-distribution.
 
 \textbf{Panel.} Harnesses: \texttt{claude} (Claude Code, frontier reference), \texttt{aider}
 (repo-map, diff-driven), \texttt{codex} (OpenAI Codex CLI, structured tool protocol),
@@ -382,6 +382,21 @@ clean plus two safety-gated passes, \texttt{goose} 1/15; \texttt{aider} 0/15, fi
 control 0 by construction)---the
 pilot's T1 discrimination pattern, now under verifier-gaming-proof tasks.
 
+\textbf{External anchor (Terminal-Bench slice).}\label{sec:anchor} The largest validity gap is
+that the battery is authored, so its discrimination could reflect task construction. As a first
+mitigation we imported 10 Terminal-Bench tasks (commit \texttt{d28711d}) through the same task
+contract---a hidden, base64-embedded oracle per task, each self-validated to discriminate (pristine
+seed fails, reference solution passes)---and ran the 7 harnesses $\times$
+\{\texttt{qwen3.5:9b}, \texttt{llama3.2:3b}\} $\times$ 3 seeds (370 cells) under the same hardening.
+The structural orderings reproduce out-of-distribution: \texttt{codex} is again a structural 0
+(0/60) and \texttt{hermes} 0/60, while the lean text harnesses lead (\texttt{pi} \goodput{}
+0.19 $>$ \texttt{aider} 0.13 $>$ thin control 0.11). With only 10 external tasks the contrast is
+underpowered---$\Delta_{\text{pi}-\text{ollama}}{=}0.10$ [$-0.03$, 0.28], task-clustered, CI
+includes 0---so the direction transfers but significance does not yet. The tasks are also hard for
+these sub-frontier local models (24/370 pass, all on the two trivial tiers), which is itself
+evidence that the homegrown discrimination is not \emph{merely} construction. The full external
+anchor remains future work.
+
 \subsection{At the frontier, quality compresses and cost discriminates}
 \label{sec:frontier}
 
@@ -438,9 +453,10 @@ against a prompt-length difficulty baseline is future work.
 supported by; we claim motivation, not confirmation---except where the pre-registered
 Phase~D arm (\S\ref{sec:ladder}) confirms out-of-sample; the remainder of the confirmatory
 design (\S\ref{sec:prereg}) is not yet complete. \textbf{Homegrown tasks.} Nine authored tasks,
-built to discriminate---the discrimination could partly reflect task construction; the
-mitigation (an external anchored slice via the task-import contract) is designed but not yet
-run. \textbf{Narrow panel.} Three local models in two families; the reach claim could be a
+built to discriminate---the discrimination could partly reflect task construction; a first
+external anchored slice (10 Terminal-Bench tasks, \S\ref{sec:anchor}) is executed and reproduces
+the structural orderings out-of-distribution, but is itself underpowered (10 tasks) and the full
+anchor remains future work. \textbf{Narrow panel.} Three local models in two families; the reach claim could be a
 family effect. \textbf{Few seeds.} Three seeds give wide intervals; many pairwise
 differences are correctly reported as not significant; only one adapter exposes a true seed
 knob (others' seeds are independent samples, flagged when zero-variance artifacts occur).
@@ -472,9 +488,10 @@ effects (the Codex discontinuity; shape-driven collapse, de-confounded) are larg
 within-interface-class model-capability effect on sub-frontier models. If capability
 explains the outcomes and interface-fit does not, the central thesis is refuted, and we will
 report it. \emph{Status:} the third-family arm (Phase~D, \S\ref{sec:ladder}) is executed and
-confirms the transfer and structural-zero predictions out-of-sample; the external task
-anchor, the $\kappa$ construct-validity study, the difficulty-router contrast, and the
-second-machine replication remain open.
+confirms the transfer and structural-zero predictions out-of-sample, and a first external-task
+anchor (10 Terminal-Bench tasks, \S\ref{sec:anchor}) reproduces the structural orderings though it
+is underpowered; the full anchor, the $\kappa$ construct-validity study, the difficulty-router
+contrast, and the second-machine replication remain open.
 
 \section{Conclusion}
 

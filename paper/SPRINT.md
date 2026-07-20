@@ -37,9 +37,9 @@
 
 | # | Task | Who | Done when |
 |---|------|-----|-----------|
-| S2.1 | Select 10–20 Terminal-Bench tasks importable via `crucible/tools/import-task.js` (need: files + a shell command that passes iff solved; container-dependent tasks may need env provisioning — pick self-contained ones first) | Claude | task dirs under `crucible/tasks/anchored/` with hermetic self-tests passing |
-| S2.2 | Run the anchor battery: installed harnesses × {qwen3.5:9b, llama3.2:3b} × 3 seeds, full §5A hardening (fit timeouts first via a T0-style calibration on the anchor slice; seeded shuffle; canary). Use `run-detached.sh` pattern; new ledger `crucible/results/anchor-tb.jsonl` (+ gitignore exception) | Claude | ledger complete, scorecard rendered |
-| S2.3 | Fold anchor results into the paper §4 (or report honestly if they complicate the story — either strengthens it); update threats section ("homegrown tasks" mitigation now partially executed); pin claims | Claude | PDF updated; audit-claims covers anchor numbers |
+| S2.1 | ✅ **DONE 2026-07-19.** Selected 10 hermetic Terminal-Bench tasks (commit `d28711d`), T0→T4, imported to `crucible/tasks/anchored/`. Extended `import-task.js` with a hidden base64-embedded Python oracle (`check_py`) + `dirs`; each task self-validates (pristine fails, reference passes). Provenance in `tasks/anchored/README.md`; importer archived in `tools/anchored-build/`. | Claude | task dirs under `crucible/tasks/anchored/` with hermetic self-tests passing |
+| S2.2 | ✅ **DONE 2026-07-20.** Calibrated (S2.2a) + ran the 370-cell battery detached via `crucible/anchor.sh` (7 harnesses × {qwen3.5:9b, llama3.2:3b} × 3 seeds, §5A hardening). Ledger `anchor-tb.jsonl` (24 passes, 90 timeouts); scorecard `SCORECARD-anchor-tb.md`. | Claude | ledger complete, scorecard rendered |
+| S2.3 | ✅ **DONE 2026-07-20.** Folded into paper §\ref{sec:anchor} (+ intro, threats "homegrown tasks", pre-registered status). Writeup in `docs/crucible-results.md` §6.9. Claims 35–39 pinned in `audit-claims.js` (all 41 pass). *Headline: structural orderings reproduce OOD — codex 0/60, hermes 0/60, lean harnesses lead (pi 0.19 > aider 0.13 > ollama 0.11) — but underpowered at 10 tasks (Δ(pi−ollama)=0.10 [−0.03, 0.28], CI incl. 0), and the tasks are hard for these local models (passes only on the trivial tiers). PDF still 8pp.* | Claude | PDF updated; audit-claims covers anchor numbers |
 | S2.4 | arXiv v2 with anchor results | **User** | v2 live |
 
 ## Sprint 3 (Aug 17 → Aug 29) — venue + submission

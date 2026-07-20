@@ -341,6 +341,49 @@ if (phaseD) {
     `others=${['aider', 'ollama', 'hermes', 'codex'].map(a => passes(t1(a))).join('/')}`);
 }
 
+// --- Sprint 2 external anchor: the Terminal-Bench slice (results §6.9) ---------------------------
+// Asserted only if the anchor ledger exists. The frozen ledger is committed, so these are exact.
+const anchor = loadLedger('anchor-tb.jsonl');
+if (anchor) {
+  const aof = a => anchor.filter(r => r.adapter === a);
+  const agp = rs => rs.length ? rs.reduce((s, r) => s + (r.timed_out ? 0 : (r.score ?? 0)), 0) / rs.length : 0;
+  const apass = rs => rs.filter(r => !r.timed_out && r.result === 'passed').length;
+  const r2 = x => Math.round(x * 100) / 100;
+  // 35. Census: 370 cells (7 harnesses × 2 models × 10 tasks + 10 mock), 24 passes, 90 timeouts.
+  claim('Anchor census: 370 cells, 24 passes, 90 timeouts (external Terminal-Bench slice)',
+    anchor.length === 370 && anchor.filter(r => r.result === 'passed').length === 24 && timeouts(anchor) === 90,
+    `n=${anchor.length} passes=${anchor.filter(r => r.result === 'passed').length} TO=${timeouts(anchor)}`);
+  // 36. H3a reproduces out-of-distribution: codex is a structural 0 on the external tasks (0/60,
+  //     Goodput 0), and the other non-fitting tool-caller hermes is ~0 too (0/60, Goodput→0.00).
+  claim('Anchor H3a: codex 0/60 Goodput 0, hermes 0/60 Goodput 0.00 (interface-fit not a homegrown artifact)',
+    aof('codex').length === 60 && apass(aof('codex')) === 0 && agp(aof('codex')) === 0 &&
+    aof('hermes').length === 60 && apass(aof('hermes')) === 0 && r2(agp(aof('hermes'))) === 0,
+    `codex ${apass(aof('codex'))}/60 gp=${agp(aof('codex')).toFixed(3)} | hermes ${apass(aof('hermes'))}/60 gp=${agp(aof('hermes')).toFixed(4)}`);
+  // 37. "The harness is the capability" transfers: the lean harnesses lead the field externally —
+  //     pi tops mean Goodput (0.19) above aider (0.13) and the thin ollama control (0.11), and every
+  //     tool-caller (codex 0, hermes 0, goose ≤0.02) sits below them.
+  const piGP = agp(aof('pi')), aiderGP = agp(aof('aider')), ollamaGP = agp(aof('ollama')), gooseGP = agp(aof('goose'));
+  claim('Anchor reach: pi 0.19 > aider 0.13 > ollama 0.11 > tool-callers (goose ≤0.02, hermes/codex 0)',
+    r2(piGP) === 0.19 && r2(aiderGP) === 0.13 && r2(ollamaGP) === 0.11 &&
+    piGP > aiderGP && aiderGP > ollamaGP && ollamaGP > gooseGP && r2(gooseGP) <= 0.02,
+    `pi=${piGP.toFixed(3)} aider=${aiderGP.toFixed(3)} ollama=${ollamaGP.toFixed(3)} goose=${gooseGP.toFixed(3)}`);
+  // 38. Honest underpower: with only 10 external tasks the task-clustered Δ(pi−ollama) point estimate
+  //     is positive on both models but its CI INCLUDES 0 — the direction transfers, significance does
+  //     not (yet). (Same clustered-bootstrap method + seed as the Phase D deltas.)
+  const dq = clusteredDelta(anchor.filter(r => r.model === 'qwen3.5:9b'), 'pi', 'ollama');
+  claim('Anchor Δ(pi−ollama) qwen3.5:9b = 0.10 [−0.03, 0.28] clustered — positive but CI incl. 0 (n.s., underpowered)',
+    r2(dq.delta) === 0.1 && r2(dq.lo) === -0.03 && r2(dq.hi) === 0.28 && dq.lo < 0 && dq.hi > 0,
+    `Δ=${dq.delta.toFixed(3)} [${dq.lo.toFixed(3)}, ${dq.hi.toFixed(3)}] n=${dq.n}/${dq.clusters} clusters`);
+  // 39. External tasks are hard for small local models: all 24 passes fall on the two trivial tasks
+  //     (hello-world, fix-permissions) plus a single jsonl-aggregator cell — 0 passes on the other
+  //     seven tasks. So the homegrown battery's discrimination is not merely task construction, and
+  //     T2+ external work must escalate to cloud.
+  const passTasks = [...new Set(anchor.filter(r => !r.timed_out && r.result === 'passed').map(r => r.task))].sort();
+  claim('Anchor difficulty: passes only on {tb-hello-world, tb-fix-permissions, tb-jsonl-aggregator}; 0 on the other 7',
+    JSON.stringify(passTasks) === JSON.stringify(['tb-fix-permissions', 'tb-hello-world', 'tb-jsonl-aggregator']),
+    passTasks.join(', ') || '(none)');
+}
+
 // --- report -------------------------------------------------------------------
 let failed = 0;
 console.log(`\nCrucible claims audit — ${rows.length} runs from ${path.relative(path.join(__dirname, '..'), LEDGER)}\n`);
