@@ -5,13 +5,6 @@
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
 
-\bibitem[Andriushchenko et~al.(2025)Andriushchenko, Souly, et~al.]{agentharm}
-Maksym Andriushchenko, Alexandra Souly, et~al.
-\newblock Agentharm: A benchmark for measuring harmfulness of {LLM} agents.
-\newblock In \emph{International Conference on Learning Representations
-  (ICLR)}, 2025.
-\newblock arXiv:2410.09024.
-
 \bibitem[Chan et~al.(2024)Chan, Chowdhury, Jaffe, et~al.]{mlebench}
 Jun~Shern Chan, Neil Chowdhury, Oliver Jaffe, et~al.
 \newblock {MLE}-bench: Evaluating machine learning agents on machine learning
@@ -23,16 +16,6 @@ Lingjiao Chen, Matei Zaharia, and James Zou.
 \newblock {FrugalGPT}: How to use large language models while reducing cost and
   improving performance, 2023.
 \newblock arXiv:2305.05176.
-
-\bibitem[Debenedetti et~al.(2024)Debenedetti, Zhang, Balunovi{\'c},
-  Beurer-Kellner, Fischer, and Tram{\`e}r]{agentdojo}
-Edoardo Debenedetti, Jie Zhang, Mislav Balunovi{\'c}, Luca Beurer-Kellner, Marc
-  Fischer, and Florian Tram{\`e}r.
-\newblock Agentdojo: A dynamic environment to evaluate prompt injection attacks
-  and defenses for {LLM} agents.
-\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS),
-  Datasets and Benchmarks Track}, 2024.
-\newblock arXiv:2406.13352.
 
 \bibitem[Ding et~al.(2024)Ding, Mallick, Wang, Sim, Mukherjee, R{\"u}hle,
   Lakshmanan, and Awadallah]{hybridllm}
@@ -72,13 +55,17 @@ Sayash Kapoor, Benedikt Stroebl, Peter Kirgis, et~al.
   (ICLR)}, 2026.
 \newblock arXiv:2510.11977.
 
-\bibitem[Lin et~al.(2026)Lin, Liu, Pan, Lin, Dou, Xi, Huang, Yan, Han, Gui, and
-  Jiang]{ahe}
-Jiahang Lin, Shichun Liu, Chengjun Pan, Lizhi Lin, Shihan Dou, Zhiheng Xi,
-  Xuanjing Huang, Hang Yan, Zhenhua Han, Tao Gui, and Yu-Gang Jiang.
-\newblock Agentic harness engineering: Observability-driven automatic evolution
-  of coding-agent harnesses, 2026.
-\newblock arXiv:2604.25850.
+\bibitem[Lewis(2026)]{samemodel}
+Sydney Lewis.
+\newblock Same model, different harness: Different coding-agent results, 2026.
+\newblock arXiv:2608.26218.
+
+\bibitem[Liu et~al.(2026)Liu, Guo, Liu, Yang, Yan, Zhao, Hua, Liu, Li, Bu, and
+  Wang]{harnessaudit}
+Chengzhi Liu, Yichen Guo, Yepeng Liu, Yuzhe Yang, Qianqi Yan, Xuandong Zhao,
+  Wenyue Hua, Sheng Liu, Sharon Li, Yuheng Bu, and Xin~Eric Wang.
+\newblock Auditing agent harness safety, 2026.
+\newblock arXiv:2605.14271.
 
 \bibitem[Liu et~al.(2024)Liu, Yu, Zhang, et~al.]{agentbench}
 Xiao Liu, Hao Yu, Hanchen Zhang, et~al.
@@ -113,21 +100,11 @@ Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph~E.
 \newblock {RouteLLM}: Learning to route {LLMs} with preference data, 2024.
 \newblock arXiv:2406.18665.
 
-\bibitem[Qu et~al.(2026)Qu, Zhang, Zhang, Deng, Li, Zhang, and Liu]{overeager}
-Yubin Qu, Ying Zhang, Yanjun Zhang, Gelei Deng, Yuekang Li, Leo~Yu Zhang, and
-  Yi~Liu.
-\newblock Overeager coding agents: Measuring out-of-scope actions on benign
-  tasks, 2026.
-\newblock arXiv:2605.18583.
-
-\bibitem[Ruan et~al.(2024)Ruan, Dong, Wang, Pitis, Zhou, Ba, Dubois, Maddison,
-  and Hashimoto]{toolemu}
-Yangjun Ruan, Honghua Dong, Andrew Wang, Silviu Pitis, Yongchao Zhou, Jimmy Ba,
-  Yann Dubois, Chris~J. Maddison, and Tatsunori Hashimoto.
-\newblock Identifying the risks of {LM} agents with an {LM}-emulated sandbox.
-\newblock In \emph{International Conference on Learning Representations
-  (ICLR)}, 2024.
-\newblock arXiv:2309.15817.
+\bibitem[Vats and Golev(2026)]{scaffoldeffect}
+Naman Vats and Oleg Golev.
+\newblock The scaffold effect in coding agents: Harness choice as a hidden
+  variable in coding-agent evaluation, 2026.
+\newblock arXiv:2607.22585.
 
 \bibitem[Xie et~al.(2024)Xie, Zhang, Chen, et~al.]{osworld}
 Tianbao Xie, Danyang Zhang, Jixuan Chen, et~al.
@@ -152,6 +129,18 @@ Shunyu Yao, Noah Shinn, Pedram Razavi, and Karthik Narasimhan.
 \newblock In \emph{International Conference on Learning Representations
   (ICLR)}, 2025.
 \newblock arXiv:2406.12045.
+
+\bibitem[Yao et~al.(2026)Yao, Tan, Liu, et~al.]{harnessbench}
+Yilun Yao, Xinyu Tan, Chao-Hsuan Liu, et~al.
+\newblock Harness-bench: Measuring harness effects across models in realistic
+  agent workflows, 2026.
+\newblock arXiv:2605.27922.
+
+\bibitem[Zhang et~al.(2026)Zhang, Wang, Ge, Xu, Hamm, and Reddy]{stopcomparing}
+Yunbei Zhang, Janet Wang, Yingqiang Ge, Weijie Xu, Jihun Hamm, and Chandan~K.
+  Reddy.
+\newblock Stop comparing {LLM} agents without disclosing the harness, 2026.
+\newblock arXiv:2605.23950.
 
 \bibitem[Zhu et~al.(2025)Zhu, Jin, et~al.]{abc}
 Yuxuan Zhu, Tengjun Jin, et~al.
