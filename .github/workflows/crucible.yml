@@ -49,3 +49,9 @@ jobs:
 
       - name: Paper figure data regenerates from the frozen ledgers
         run: node paper/figs/make-figs.js --check
+
+      - name: Paper experiment inventory regenerates from the frozen ledgers
+        run: node crucible/tools/inventory.js --check
+
+      - name: Paper reanalysis tables + figures regenerate from the frozen ledgers
+        run: node crucible/tools/reanalysis.js --check

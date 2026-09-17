@@ -42,7 +42,7 @@ crucible/results/*.log
 !crucible/results/qwen35-hermes-fix.jsonl
 
 # per-battery integrity/canary sidecars (transient)
-crucible/results/*.integrity.jsonl
+# crucible/results/*.integrity.jsonl  — NO LONGER ignored (2026-09-17): sandbox-escape evidence must be retained (paper/INVENTORY.md §C.7)
 crucible/results/*.canary.jsonl
 !crucible/results/cloud-b2.jsonl
 !crucible/results/cloud-claude-t1.jsonl
