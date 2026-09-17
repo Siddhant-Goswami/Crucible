@@ -1,0 +1,163 @@
+\begin{thebibliography}{21}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Andriushchenko et~al.(2025)Andriushchenko, Souly, et~al.]{agentharm}
+Maksym Andriushchenko, Alexandra Souly, et~al.
+\newblock Agentharm: A benchmark for measuring harmfulness of {LLM} agents.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2025.
+\newblock arXiv:2410.09024.
+
+\bibitem[Chan et~al.(2024)Chan, Chowdhury, Jaffe, et~al.]{mlebench}
+Jun~Shern Chan, Neil Chowdhury, Oliver Jaffe, et~al.
+\newblock {MLE}-bench: Evaluating machine learning agents on machine learning
+  engineering, 2024.
+\newblock arXiv:2410.07095.
+
+\bibitem[Chen et~al.(2023)Chen, Zaharia, and Zou]{frugalgpt}
+Lingjiao Chen, Matei Zaharia, and James Zou.
+\newblock {FrugalGPT}: How to use large language models while reducing cost and
+  improving performance, 2023.
+\newblock arXiv:2305.05176.
+
+\bibitem[Debenedetti et~al.(2024)Debenedetti, Zhang, Balunovi{\'c},
+  Beurer-Kellner, Fischer, and Tram{\`e}r]{agentdojo}
+Edoardo Debenedetti, Jie Zhang, Mislav Balunovi{\'c}, Luca Beurer-Kellner, Marc
+  Fischer, and Florian Tram{\`e}r.
+\newblock Agentdojo: A dynamic environment to evaluate prompt injection attacks
+  and defenses for {LLM} agents.
+\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS),
+  Datasets and Benchmarks Track}, 2024.
+\newblock arXiv:2406.13352.
+
+\bibitem[Ding et~al.(2024)Ding, Mallick, Wang, Sim, Mukherjee, R{\"u}hle,
+  Lakshmanan, and Awadallah]{hybridllm}
+Dujian Ding, Ankur Mallick, Chi Wang, Robert Sim, Subhabrata Mukherjee, Victor
+  R{\"u}hle, Laks V.~S. Lakshmanan, and Ahmed~Hassan Awadallah.
+\newblock Hybrid {LLM}: Cost-efficient and quality-aware query routing, 2024.
+\newblock arXiv:2404.14618.
+
+\bibitem[{Epoch AI}(2024)]{epoch2024benchmarking}
+{Epoch AI}.
+\newblock Why benchmarking is hard.
+\newblock \url{https://epoch.ai/gradient-updates/why-benchmarking-is-hard},
+  2024.
+
+\bibitem[Jimenez et~al.(2024)Jimenez, Yang, Wettig, Yao, Pei, Press, and
+  Narasimhan]{swebench}
+Carlos~E. Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir
+  Press, and Karthik Narasimhan.
+\newblock {SWE}-bench: Can language models resolve real-world {GitHub} issues?
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2024.
+\newblock arXiv:2310.06770.
+
+\bibitem[Kapoor et~al.(2025)Kapoor, Stroebl, Siegel, Nadgir, and
+  Narayanan]{aiagents}
+Sayash Kapoor, Benedikt Stroebl, Zachary~S. Siegel, Nitya Nadgir, and Arvind
+  Narayanan.
+\newblock {AI} agents that matter.
+\newblock \emph{Transactions on Machine Learning Research (TMLR)}, 2025.
+\newblock arXiv:2407.01502.
+
+\bibitem[Kapoor et~al.(2026)Kapoor, Stroebl, Kirgis, et~al.]{hal}
+Sayash Kapoor, Benedikt Stroebl, Peter Kirgis, et~al.
+\newblock Holistic agent leaderboard: The missing infrastructure for {AI} agent
+  evaluation.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2026.
+\newblock arXiv:2510.11977.
+
+\bibitem[Lin et~al.(2026)Lin, Liu, Pan, Lin, Dou, Xi, Huang, Yan, Han, Gui, and
+  Jiang]{ahe}
+Jiahang Lin, Shichun Liu, Chengjun Pan, Lizhi Lin, Shihan Dou, Zhiheng Xi,
+  Xuanjing Huang, Hang Yan, Zhenhua Han, Tao Gui, and Yu-Gang Jiang.
+\newblock Agentic harness engineering: Observability-driven automatic evolution
+  of coding-agent harnesses, 2026.
+\newblock arXiv:2604.25850.
+
+\bibitem[Liu et~al.(2024)Liu, Yu, Zhang, et~al.]{agentbench}
+Xiao Liu, Hao Yu, Hanchen Zhang, et~al.
+\newblock Agentbench: Evaluating {LLMs} as agents.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2024.
+\newblock arXiv:2308.03688.
+
+\bibitem[Merrill et~al.(2026)Merrill, Shaw, Carlini, et~al.]{terminalbench}
+Mike~A. Merrill, Alexander~G. Shaw, Nicholas Carlini, et~al.
+\newblock Terminal-bench: Benchmarking agents on hard, realistic tasks in
+  command line interfaces, 2026.
+\newblock arXiv:2601.11868.
+
+\bibitem[Mialon et~al.(2023)Mialon, Fourrier, Swift, Wolf, LeCun, and
+  Scialom]{gaia}
+Gr{\'e}goire Mialon, Cl{\'e}mentine Fourrier, Craig Swift, Thomas Wolf, Yann
+  LeCun, and Thomas Scialom.
+\newblock {GAIA}: A benchmark for general {AI} assistants, 2023.
+\newblock arXiv:2311.12983.
+
+\bibitem[Miller(2024)]{errorbars}
+Evan Miller.
+\newblock Adding error bars to evals: A statistical approach to language model
+  evaluations, 2024.
+\newblock arXiv:2411.00640.
+
+\bibitem[Ong et~al.(2024)Ong, Almahairi, Wu, Chiang, Wu, Gonzalez, Kadous, and
+  Stoica]{routellm}
+Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph~E.
+  Gonzalez, M.~Waleed Kadous, and Ion Stoica.
+\newblock {RouteLLM}: Learning to route {LLMs} with preference data, 2024.
+\newblock arXiv:2406.18665.
+
+\bibitem[Qu et~al.(2026)Qu, Zhang, Zhang, Deng, Li, Zhang, and Liu]{overeager}
+Yubin Qu, Ying Zhang, Yanjun Zhang, Gelei Deng, Yuekang Li, Leo~Yu Zhang, and
+  Yi~Liu.
+\newblock Overeager coding agents: Measuring out-of-scope actions on benign
+  tasks, 2026.
+\newblock arXiv:2605.18583.
+
+\bibitem[Ruan et~al.(2024)Ruan, Dong, Wang, Pitis, Zhou, Ba, Dubois, Maddison,
+  and Hashimoto]{toolemu}
+Yangjun Ruan, Honghua Dong, Andrew Wang, Silviu Pitis, Yongchao Zhou, Jimmy Ba,
+  Yann Dubois, Chris~J. Maddison, and Tatsunori Hashimoto.
+\newblock Identifying the risks of {LM} agents with an {LM}-emulated sandbox.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2024.
+\newblock arXiv:2309.15817.
+
+\bibitem[Xie et~al.(2024)Xie, Zhang, Chen, et~al.]{osworld}
+Tianbao Xie, Danyang Zhang, Jixuan Chen, et~al.
+\newblock {OSWorld}: Benchmarking multimodal agents for open-ended tasks in
+  real computer environments, 2024.
+\newblock arXiv:2404.07972.
+
+\bibitem[Yang et~al.(2024)Yang, Jimenez, Wettig, Lieret, Yao, Narasimhan, and
+  Press]{sweagent}
+John Yang, Carlos~E. Jimenez, Alexander Wettig, Kilian Lieret, Shunyu Yao,
+  Karthik Narasimhan, and Ofir Press.
+\newblock {SWE}-agent: Agent-computer interfaces enable automated software
+  engineering.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, 2024.
+\newblock arXiv:2405.15793.
+
+\bibitem[Yao et~al.(2025)Yao, Shinn, Razavi, and Narasimhan]{taubench}
+Shunyu Yao, Noah Shinn, Pedram Razavi, and Karthik Narasimhan.
+\newblock $\tau$-bench: A benchmark for tool-agent-user interaction in
+  real-world domains.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2025.
+\newblock arXiv:2406.12045.
+
+\bibitem[Zhu et~al.(2025)Zhu, Jin, et~al.]{abc}
+Yuxuan Zhu, Tengjun Jin, et~al.
+\newblock Establishing best practices for building rigorous agentic benchmarks.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, 2025.
+\newblock arXiv:2507.02825.
+
+\end{thebibliography}
