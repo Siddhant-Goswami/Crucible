@@ -47,7 +47,23 @@ const readLedger = id => {
   if (!fs.existsSync(p)) return null;
   return fs.readFileSync(p, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
 };
+// A shallow clone (e.g. actions/checkout's default fetch-depth: 1) cannot answer
+// `git log --diff-filter=A`, and would silently regenerate every freezing commit as '?'.
+// Fail loudly instead — the inventory's provenance column is load-bearing for the paper.
+let shallowChecked = false;
+const assertFullHistory = () => {
+  if (shallowChecked) return;
+  shallowChecked = true;
+  try {
+    if (execSync('git rev-parse --is-shallow-repository', { cwd: ROOT }).toString().trim() === 'true') {
+      console.error('inventory: this is a SHALLOW clone — ledger freezing commits cannot be resolved.\n' +
+        '  Fetch the full history first (git fetch --unshallow, or actions/checkout with fetch-depth: 0).');
+      process.exit(2);
+    }
+  } catch { /* not a git repo at all — firstCommit() reports '?' per ledger below */ }
+};
 const firstCommit = id => {
+  assertFullHistory();
   try {
     const out = execSync(`git log --diff-filter=A --format='%h %ad' --date=short -- crucible/results/${id}.jsonl`, { cwd: ROOT }).toString().trim().split('\n').filter(Boolean);
     return out[out.length - 1] || '?';

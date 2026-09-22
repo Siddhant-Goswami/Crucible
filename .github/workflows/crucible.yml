@@ -1,7 +1,7 @@
 name: crucible
 on:
   push:
-    paths: ['crucible/**', 'loop.sh', 'adapters/**', 'tasks/**', 'paper/figs/**', '.github/workflows/crucible.yml']
+    paths: ['crucible/**', 'loop.sh', 'adapters/**', 'tasks/**', 'paper/**', '.github/workflows/crucible.yml']
   pull_request:
   workflow_dispatch:
 
@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # inventory.js reads each ledger's freezing commit via `git log --diff-filter=A`,
+          # which a shallow clone cannot answer — fetch the full history.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
