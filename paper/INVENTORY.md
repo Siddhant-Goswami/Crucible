@@ -139,8 +139,13 @@ moves to the future-work paragraph or is dropped.
 | 12 | Sandbox escape: a harness deleted a file from the pristine task source; guard fired twice in production (§4.5) | `docs/crucible-hypotheses.md` §3 H7 (dated observation, 2026-07-03, pi on `tool-recover-lock`) — **no sidecar on disk or in git** (`*.integrity.jsonl` is gitignored and none survive locally) | — | **REWORD** | Report the single documented observation (pi, T1 piloting, 2026-07-03) as an anecdote with the guard's mechanism (`loop.sh:73`); **drop the "fired twice in production" count** — its evidence was not retained. Un-ignore `*.integrity.jsonl` going forward so future cohorts keep it. |
 | 13 | "The harness *is* the capability" / harness effects dominate model capability (README, results §6.7) | — | — | **DEFER / drop from paper** | Mentor's first "change or defer" row. v1 shows *within-model* configuration effects on a bounded battery; it does not estimate the harness-vs-model variance decomposition (that is 2605.23950's claim, and it needs a design v1 doesn't have). |
 
-**Completion condition (mentor §1):** every KEEP/REWORD row names a cohort in §A and a pinned
-claim; no row depends on unfinished work. Rows 8, 10, 13 are removed from headlines.
+**Completion condition (mentor §1):** every KEEP/REWORD row names its evidence — a cohort in §A
+together with a pinned claim in `audit-claims.js`, or, where no pinned number carries the claim,
+the specific artifact that does. Two rows take the second form: row 9 rests on
+`SCORECARD-claude.md` (the `battery.published` Claude slice, reported as an appendix observation,
+not a pinned headline number) and row 12 on a single dated observation in
+`docs/crucible-hypotheses.md` §3 H7 whose sidecar was not retained. No row depends on unfinished
+work. Rows 8, 10, 13 are removed from headlines.
 
 ---
 

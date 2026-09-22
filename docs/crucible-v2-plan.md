@@ -62,12 +62,12 @@ Also worth a sentence each: HAL (cost-aware agent leaderboard, model-first), Ada
 Three falsifiable hypotheses, each with a refutation condition (same discipline as `crucible-hypotheses.md` §3):
 
 ### H-A — Evaluator validity from few examples
-- **Claim.** A hybrid evaluator synthesized from a task description + k∈{2,3,5} golden examples, then calibrated on ~20 user-graded outputs, agrees with the user's held-out grades at Cohen's κ ≥ 0.6 (substantial), and hybrid > judge-only > rules-only on the quality dimensions.
+- **Claim.** A hybrid evaluator synthesized from a task description + k∈{2,3,5} golden examples, then calibrated on the ~10 calibration grades of a ~20-output graded sample (the other ~10 are held out — §3 item 3), agrees with the user's held-out grades at Cohen's κ ≥ 0.6 (substantial), and hybrid > judge-only > rules-only on the quality dimensions.
 - **Refuted if** κ < 0.4 on most tasks, or agreement does not improve from k=2 to k=5, or calibration on the golden set does not raise κ over an uncalibrated judge.
 - **At-risk regressions.** Criteria drift (EvalGen): users revise criteria after seeing outputs — measure it by re-asking users to grade the golden set at the end. Judge self-preference: the judge model favors outputs from its own family — test by rotating the judge across two families and reporting the delta.
 
 ### H-B — Selection value over baselines
-- **Claim.** The config the personalized benchmark recommends has lower cost at the user's quality bar than (a) always-frontier, (b) the top of a generic leaderboard, (c) an open router (RouteLLM-style, run on the task prompt), and (d) cheapest-config; and its regret vs. the oracle-best config on held-out repetitions is small (< 0.1 Goodput).
+- **Claim.** The config the personalized benchmark recommends has lower cost at the user's quality bar than (a) always-frontier, (b) the top of a generic leaderboard, (c) an open router (RouteLLM-style, run on the task prompt), and (d) cheapest-config; and its regret vs. the oracle-best config on held-out repetitions is small (< 0.1 Goodput). Baselines that miss the quality bar have infeasible cost-at-bar and are excluded from the paired test on that task (§3 item 6).
 - **Refuted if** the frontier default is on the Pareto frontier for most tasks (nothing cheaper clears the bar), or the generic pick / router matches the personalized pick's cost at the bar — i.e., personalization buys nothing.
 - **Why this could be true (from v1).** The winner was tier-specific (pi@qwen3:8b for tool-recovery, aider@deepseek-r1:8b for multi-file); the same 2b model went 0.24→0.79 with a harness swap; at the frontier quality compressed and cost differed 6×. A generic rank cannot see any of that.
 
@@ -93,8 +93,12 @@ Each item names the v1 file it extends. Keep the SPEC conformance rules; add to 
 4. **Recommender — new `crucible/recommend.js` reading a ledger.**
    Per task: Pareto over (Goodput, $/run, wall) subject to the user's quality bar; output the recommendation sentence with CIs ("aider@qwen3.5:9b at $0.00/run, Goodput 0.81 [0.72, 0.88] vs claude-code 0.94 at $1.38") plus the four baselines' picks and their cost at the bar. Regret vs. oracle on held-out seeds.
 5. **Break-even — extend `cost.js`.**
-   `N* = (C_construct + C_sweep) / (c_default − c_selected)` with the quality constraint; sensitivity table over wage ∈ {$20, $50, $150}/h and over sweep size.
-6. **Baselines (real, not straw).** (a) Claude Code / frontier default; (b) generic-leaderboard pick — top of Aider polyglot for coding tasks, LMArena or HAL for knowledge work, whichever config we can actually run; (c) an open router — RouteLLM's released router pointed at the same strong/weak pair; (d) cheapest config that runs. Pin all four picks in `audit-claims.js`.
+   `N* = (C_construct + C_sweep) / (c_default − c_selected)` with the quality constraint, defined only when `c_default > c_selected`. When `c_default ≤ c_selected` the selected config never pays back against the default: `cost.js` emits `N* = ∞` (`break_even: null`, `reason: "no-break-even"`) rather than a negative or divide-by-zero number. Such tasks are counted and reported as a "never pays back" share alongside the N* distribution; they are excluded from the median/IQR (which are over the finite N* only) and shown as a separate row — not a blank cell — in every sensitivity table. Sensitivity over wage ∈ {$20, $50, $150}/h and over sweep size.
+6. **Baselines (real, not straw).** (a) Claude Code / frontier default; (b) generic-leaderboard pick; (c) an open router — RouteLLM's released router pointed at the same strong/weak pair; (d) cheapest config that runs.
+   - **(b) is frozen before data collection.** Pre-register one leaderboard, one dated snapshot of it, and the exact config that snapshot's top runnable entry maps to — Aider polyglot for coding tasks, LMArena or HAL for knowledge work, chosen per *domain* and then fixed, never per task or per whatever happened to be available that day. Record the snapshot URL/date, the entry, and the resolved (model, harness) in `ENV.md` before the sweep and keep it for the whole sweep. If that config cannot run on a given task, report baseline (b) as **unavailable** for that task and drop the task from the H-B (b) comparison; do not substitute another leaderboard or entry.
+   - **Infeasible baselines.** Cost-at-bar is defined only for a config that clears the user's quality bar. A baseline that runs but misses the bar has cost-at-bar **infeasible** (∞), not its observed cost; the H-B pairwise difference against it is undefined and the task is excluded from that baseline's paired test, with the exclusion count reported. This applies most often to (d): "cheapest config that runs" is the cheapest config *that clears the bar*, and if none does, (d) is infeasible for that task. A baseline that is infeasible on most tasks is itself the H-B result and is reported as such.
+
+   Pin all four picks, the (b) snapshot, and the per-task feasibility flags in `audit-claims.js`.
 
 Everything stays deterministic-and-drift-guarded: the ledger is frozen, `report.js` regenerates, `audit-claims.js` pins the numbers, CI fails on drift. That machinery is v1's most reusable asset and it is rare in this literature — keep it visible in the paper.
 
@@ -115,7 +119,7 @@ Everything stays deterministic-and-drift-guarded: the ledger is frozen, `report.
 **Analysis plan (pre-register before Phase 3).**
 - H-A: κ per (task, evaluator type, k) with bootstrap CI; paired comparison hybrid vs. rules-only vs. judge-only; drift test on the golden set.
 - H-B: per task, the recommended config's cost at bar vs. each baseline; task-clustered bootstrap on the paired cost difference; regret vs. oracle on held-out seeds.
-- H-C: N* per task; median and IQR; sensitivity grid.
+- H-C: N* per task; median and IQR over the tasks with a finite N*, plus the share with no break-even (`c_default ≤ c_selected`); sensitivity grid.
 - Everything regenerates from a frozen ledger; every number in the paper pinned.
 
 ---

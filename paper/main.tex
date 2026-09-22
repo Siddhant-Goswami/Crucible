@@ -50,13 +50,14 @@ task and resource conditions, how the configuration affects \emph{delivery}---a 
 within a stated deadline---and what observable failures explain the rest. \crucible{} is a
 small apparatus for that question: a one-line adapter contract, a bounded act$\to$verify loop
 owned by the runner, deterministic hidden verifiers, uniform token metering, and frozen run
-ledgers from which every reported number regenerates in CI. We report 1{,}448 attempted runs
-across five local cohorts (seven harnesses; six local models in three families) plus small
-cloud slices. Three findings survive a reanalysis on matched task sets with task-clustered
-intervals. (i)~Within a model column, harness choice moves delivery from 0.00 to 0.89 on
-\texttt{qwen3:8b}, but only two of the pre-named within-model contrasts are significant under
-both delivery and the gated score; three others are significant under one metric only, and we
-show which. (ii)~Holding weights fixed on \texttt{qwen3.5:9b}, one tool-calling harness delivers
+ledgers from which every reported number regenerates in CI. We report 1{,}600 attempted
+runs---1{,}527 local across five cohorts (six local harnesses; seven models in three families)
+and 73 in three small cloud arms, where a seventh harness appears. Three findings survive a
+reanalysis on matched task sets with task-clustered intervals. (i)~Within a model column,
+harness choice moves delivery from 0.00 to 0.89 on \texttt{qwen3:8b}, but only six of the
+pre-named within-model contrasts are significant under both delivery and the gated score; two
+others are significant under one metric only, and we show which. (ii)~Holding weights fixed
+on \texttt{qwen3.5:9b}, one tool-calling harness delivers
 0.89 while another delivers 0.00 ($\Delta{=}{+}0.89$ \ci{0.78}{1.00}): the same harness is 0 for
 262 of 262 attempted local cells across five cohorts, a protocol failure visible in every trace,
 while it delivers 20/20 on its vendor's cloud account. (iii)~Scoring finished runs only reorders
@@ -216,11 +217,13 @@ Size ladder & 4 $\times$ \texttt{qwen3.5:\{2b,4b,9b\}} & 6 & 222 & 200 & 78 & de
 Phase D & 6 lean $\times$ \texttt{llama3.2:3b}, 5 seeds & 11 & 341 & 336 & 75 & \textbf{pre-registered}\\
 Anchor & 6 lean $\times$ 2 local, Terminal-Bench & 10 & 370 & 280 & 24 & adapted tasks, underpowered\\
 \midrule
-Cloud & codex (account default); aider, pi @ \texttt{gpt-4o-mini}; Claude Code & 3--4 & 73 & 72 & 66 & demonstrations, small $n$\\
+Cloud & codex (account default); aider, pi @ \texttt{gpt-4o-mini}; Claude Code & 3--4 & 73 & 72 & 65 & demonstrations, small $n$\\
 \bottomrule
 \end{tabular}
 \caption{Cohorts. ``Attempted'' includes timeouts; ``finished'' excludes them; ``delivered'' is a
-verifier pass within deadline. Counts from \texttt{INVENTORY.md} \S A.1.}
+verifier pass within deadline. Counts from \texttt{INVENTORY.md} \S A.1, which reports each ledger
+whole: the Pilot ledger contains 20 cloud cells that the Cloud row also counts, so the column does
+not sum to the study total of 1{,}600 attempted runs (1{,}527 local, 73 cloud).}
 \label{tab:cohorts}
 \end{table}
 
@@ -234,7 +237,7 @@ verifier pass within deadline. Counts from \texttt{INVENTORY.md} \S A.1.}
 \centering\small
 \begin{tabular}{llrrrl}
 \toprule
-Model & Harness & Attempted & Delivered & Delivery \ci{95\%}{} & \goodput{}\\
+Model & Harness & Attempted & Delivered & Delivery, 95\% CI & \goodput{}\\
 \midrule
 \multirow{6}{*}{\texttt{qwen3:8b}}
  & ollama (control) & 27 & 24 & \textbf{0.89} \ci{0.67}{1.00} & 0.88\\
@@ -282,13 +285,15 @@ Two hold under both metrics in the pilot: \texttt{goose} below the control on \t
 \ci{0.04}{0.30}). The contrast our earlier draft headlined---\texttt{aider} above the control on
 \texttt{deepseek-r1:1.5b}---is significant on the gated score ($+0.37$ \ci{0.09}{0.65}) but
 \emph{not} on delivery ($+0.30$ \ci{0.00}{0.59}): partial checkpoint credit carries it. The two
-best harnesses on \texttt{qwen3:8b} are a tie on either metric.
+best harnesses on \texttt{qwen3:8b} are a tie on either metric. Across all cohorts, six of the
+pre-named within-model contrasts are significant under both metrics and two under exactly one;
+the rest are indistinguishable from zero on both.
 
 \begin{table}[t]
 \centering\small
 \begin{tabular}{lllrll}
 \toprule
-Cohort & Contrast ($a-b$) & Model & Tasks & $\Delta$ delivery \ci{95\%}{} & $\Delta$ \goodput{} \ci{95\%}{}\\
+Cohort & Contrast ($a-b$) & Model & Tasks & $\Delta$ delivery, 95\% CI & $\Delta$ \goodput{}, 95\% CI\\
 \midrule
 Pilot & aider $-$ ollama & \texttt{deepseek-r1:1.5b} & 9 & $+0.30$ \ci{0.00}{0.59} & $+0.37$ \ci{0.09}{0.65}$^{*}$\\
 Pilot & aider $-$ ollama & \texttt{deepseek-r1:8b} & 9 & $+0.15$ \ci{0.04}{0.30}$^{*}$ & $+0.18$ \ci{0.04}{0.34}$^{*}$\\
@@ -313,7 +318,7 @@ Ladder & pi@2b $-$ ollama@9b & --- & 6 & $+0.17$ \ci{-0.33}{0.61} & $+0.14$ \ci{
 \bottomrule
 \end{tabular}
 \caption{Direct contrasts, paired by (task, seed), task-clustered 95\% bootstrap intervals.
-$^{*}$: interval excludes 0. Pilot contrasts are host-conditional (\S\ref{sec:timeouts}). Three
+$^{*}$: interval excludes 0. Pilot contrasts are host-conditional (\S\ref{sec:timeouts}). Two
 rows are significant under one metric only.}
 \label{tab:contrasts}
 \end{table}
@@ -326,7 +331,7 @@ rows are significant under one metric only.}
 \begin{minipage}[t]{0.48\linewidth}\centering\input{figs/codex-bookend}\end{minipage}\hfill
 \begin{minipage}[t]{0.48\linewidth}\centering\input{figs/ladder-pass}\end{minipage}
 \caption{\textbf{(left)} \texttt{codex} delivery per model over \emph{attempted} cells: 0 of 262
-across six local models in three families and five cohorts, versus 20/20 on its vendor's cloud
+across seven local models in three families and five cohorts, versus 20/20 on its vendor's cloud
 account (model identity: account default, see \S\ref{sec:setup}). \textbf{(right)} Size ladder:
 delivery per harness across \texttt{qwen3.5} \{2b, 4b, 9b\} (4 harnesses $\times$ 6 tasks $\times$
 3 seeds, full hardening). Tick labels give parameter counts (2.3B / 4.7B / 9.7B); quantized stored
@@ -441,7 +446,7 @@ traces, the identical ``delivered nothing'' outcome has at least three mechanism
 
 \textbf{Protocol failure (\texttt{codex}).} Codex CLI's headless runner requires the model to speak
 its structured tool-call dialect. On every local model in this study it produces no artifact: 0 of
-262 attempted cells (258 finished; 4 hung without completing a model call) across six models, three
+262 attempted cells (258 finished; 4 hung without completing a model call) across seven models, three
 families, and five cohorts (Figure~\ref{fig:main}, left). The cleanest demonstration holds weights
 fixed: on \texttt{qwen3.5:9b}, a model that emits well-formed OpenAI-style tool calls, \texttt{codex}
 delivers 0/18 while \texttt{pi}---another tool-calling harness on the same weights, same tasks, same
@@ -545,7 +550,7 @@ and pilot T1 cells are never pooled with later ones.
 \textbf{Exploratory analysis.} Hypotheses were sharpened on the pilot they are supported by; only
 Phase~D was pre-registered, and the primary prediction of our pre-registration (that interface-fit
 effects exceed within-class capability effects) was never tested because the full panel it required
-was not run (Appendix~\ref{app:predictions}). The delivery outcome is a post-hoc choice; three
+was not run (Appendix~\ref{app:predictions}). The delivery outcome is a post-hoc choice; two
 contrasts change significance between metrics (Table~\ref{tab:contrasts}). \textbf{Authored tasks,
 few of them.} Nine tasks built to discriminate; intervals are wide and task-clustered. The
 Terminal-Bench slice is adapted and underpowered. \textbf{One host.} All local runs share one
