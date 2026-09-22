@@ -63,11 +63,12 @@ Three falsifiable hypotheses, each with a refutation condition (same discipline 
 
 ### H-A — Evaluator validity from few examples
 - **Claim.** A hybrid evaluator synthesized from a task description + k∈{2,3,5} golden examples, then calibrated on the ~10 calibration grades of a ~20-output graded sample (the other ~10 are held out — §3 item 3), agrees with the user's held-out grades at Cohen's κ ≥ 0.6 (substantial), and hybrid > judge-only > rules-only on the quality dimensions.
-- **Refuted if** κ < 0.4 on most tasks, or agreement does not improve from k=2 to k=5, or calibration on the golden set does not raise κ over an uncalibrated judge.
+- **Refuted if** κ < 0.4 on most tasks, or agreement does not improve from k=2 to k=5, or calibration on the ~10 calibration grades does not raise κ over an uncalibrated judge.
 - **At-risk regressions.** Criteria drift (EvalGen): users revise criteria after seeing outputs — measure it by re-asking users to grade the golden set at the end. Judge self-preference: the judge model favors outputs from its own family — test by rotating the judge across two families and reporting the delta.
 
 ### H-B — Selection value over baselines
-- **Claim.** The config the personalized benchmark recommends has lower cost at the user's quality bar than (a) always-frontier, (b) the top of a generic leaderboard, (c) an open router (RouteLLM-style, run on the task prompt), and (d) cheapest-config; and its regret vs. the oracle-best config on held-out repetitions is small (< 0.1 Goodput). Baselines that miss the quality bar have infeasible cost-at-bar and are excluded from the paired test on that task (§3 item 6).
+- **Claim.** The config the personalized benchmark recommends has lower cost at the user's quality bar than (a) always-frontier, (b) the top of a generic leaderboard, and (c) an open router (RouteLLM-style, run on the task prompt); and its regret vs. the oracle-best config on held-out repetitions is small (< 0.1 Goodput). Baselines that miss the quality bar have infeasible cost-at-bar and are excluded from the paired test on that task (§3 item 6).
+- **Baseline (d) is a bound, not a rival.** Once cost-at-bar is feasible only for configs that clear the bar (§3 item 6), (d) — the cheapest swept config that clears it — is by construction the minimum feasible cost in the swept set, so the recommendation can tie it but never beat it. (d) is therefore reported as the in-sweep cost **lower bound**, and the quantity of interest is the *gap* to it: cost(recommended) − cost(d) at the bar, per task, with a task-clustered CI. A gap of zero means the selection found the cheapest config that clears the bar; a large gap means the recommender is leaving money on the table even though it may still beat (a)–(c).
 - **Refuted if** the frontier default is on the Pareto frontier for most tasks (nothing cheaper clears the bar), or the generic pick / router matches the personalized pick's cost at the bar — i.e., personalization buys nothing.
 - **Why this could be true (from v1).** The winner was tier-specific (pi@qwen3:8b for tool-recovery, aider@deepseek-r1:8b for multi-file); the same 2b model went 0.24→0.79 with a harness swap; at the frontier quality compressed and cost differed 6×. A generic rank cannot see any of that.
 
@@ -96,7 +97,7 @@ Each item names the v1 file it extends. Keep the SPEC conformance rules; add to 
    `N* = (C_construct + C_sweep) / (c_default − c_selected)` with the quality constraint, defined only when `c_default > c_selected`. When `c_default ≤ c_selected` the selected config never pays back against the default: `cost.js` emits `N* = ∞` (`break_even: null`, `reason: "no-break-even"`) rather than a negative or divide-by-zero number. Such tasks are counted and reported as a "never pays back" share alongside the N* distribution; they are excluded from the median/IQR (which are over the finite N* only) and shown as a separate row — not a blank cell — in every sensitivity table. Sensitivity over wage ∈ {$20, $50, $150}/h and over sweep size.
 6. **Baselines (real, not straw).** (a) Claude Code / frontier default; (b) generic-leaderboard pick; (c) an open router — RouteLLM's released router pointed at the same strong/weak pair; (d) cheapest config that runs.
    - **(b) is frozen before data collection.** Pre-register one leaderboard, one dated snapshot of it, and the exact config that snapshot's top runnable entry maps to — Aider polyglot for coding tasks, LMArena or HAL for knowledge work, chosen per *domain* and then fixed, never per task or per whatever happened to be available that day. Record the snapshot URL/date, the entry, and the resolved (model, harness) in `ENV.md` before the sweep and keep it for the whole sweep. If that config cannot run on a given task, report baseline (b) as **unavailable** for that task and drop the task from the H-B (b) comparison; do not substitute another leaderboard or entry.
-   - **Infeasible baselines.** Cost-at-bar is defined only for a config that clears the user's quality bar. A baseline that runs but misses the bar has cost-at-bar **infeasible** (∞), not its observed cost; the H-B pairwise difference against it is undefined and the task is excluded from that baseline's paired test, with the exclusion count reported. This applies most often to (d): "cheapest config that runs" is the cheapest config *that clears the bar*, and if none does, (d) is infeasible for that task. A baseline that is infeasible on most tasks is itself the H-B result and is reported as such.
+   - **Infeasible baselines.** Cost-at-bar is defined only for a config that clears the user's quality bar. A baseline that runs but misses the bar has cost-at-bar **infeasible** (∞), not its observed cost; the H-B pairwise difference against it is undefined and the task is excluded from that baseline's paired test, with the exclusion count reported. This redefines (d): "cheapest config that runs" becomes the cheapest swept config *that clears the bar*, and if none does, (d) is infeasible for that task. That makes (d) the minimum feasible cost in the swept set rather than a rival the recommendation can beat — it enters H-B as a lower bound and a cost gap, not a strict-beat comparator (§2, H-B). A baseline that is infeasible on most tasks is itself the H-B result and is reported as such.
 
    Pin all four picks, the (b) snapshot, and the per-task feasibility flags in `audit-claims.js`.
 
@@ -118,7 +119,7 @@ Everything stays deterministic-and-drift-guarded: the ledger is frozen, `report.
 
 **Analysis plan (pre-register before Phase 3).**
 - H-A: κ per (task, evaluator type, k) with bootstrap CI; paired comparison hybrid vs. rules-only vs. judge-only; drift test on the golden set.
-- H-B: per task, the recommended config's cost at bar vs. each baseline; task-clustered bootstrap on the paired cost difference; regret vs. oracle on held-out seeds.
+- H-B: per task, the recommended config's cost at bar vs. baselines (a)–(c); task-clustered bootstrap on the paired cost difference; the cost gap to the (d) lower bound with its own CI; regret vs. oracle on held-out seeds.
 - H-C: N* per task; median and IQR over the tasks with a finite N*, plus the share with no break-even (`c_default ≤ c_selected`); sensitivity grid.
 - Everything regenerates from a frozen ledger; every number in the paper pinned.
 
@@ -130,7 +131,7 @@ Everything stays deterministic-and-drift-guarded: the ledger is frozen, `report.
 |---|---|---|---|
 | **0 — Decide the v1 paper** | 1 | Pick §6 option; if arXiv, post it (it becomes citable motivation for v2) | decision recorded in `SPRINT.md` |
 | **1 — Evaluator pilot** | 3 | Build `synth/` + hybrid scoring; run on 3 of *your own* tasks (research brief, grading, deck); you are user #1; measure κ | **hybrid κ ≥ 0.6 on ≥ 2/3 tasks.** If not, the judge is too noisy for selection — stop and write the negative result as a short paper (JUDGe-style venues take it) |
-| **2 — Sweep + recommender** | 4 | 10+ tasks × ~11 configs × 5 seeds; `recommend.js`; four baselines; break-even calc | recommender beats ≥ 2 baselines on cost-at-bar on a majority of tasks |
+| **2 — Sweep + recommender** | 4 | 10+ tasks × ~11 configs × 5 seeds; `recommend.js`; four baselines; break-even calc | recommender beats ≥ 2 of baselines (a)–(c) on cost-at-bar on a majority of tasks; the gap to the (d) bound is reported, not gated |
 | **3 — External users** | 3 | Recruit 6–10 users, 15–20 tasks total; **pre-register** H-A/B/C thresholds and the config list before running; held-out grading; drift re-grade | ledger frozen, claims pinned |
 | **4 — Write** | 3 | paper + datasheet + release | — |
 
@@ -165,7 +166,7 @@ Whatever you pick, rewrite `crucible-related-work.md` §1 and §2.3 and the pape
 
 ## 8. Contribution statement (draft — three bullets, each with its evidence)
 
-1. **A method** for constructing a task-specific hybrid evaluator from a plain-language description and 2–5 golden examples, calibrated on ~20 user grades, with judge–human agreement reported as a first-class metric (H-A).
+1. **A method** for constructing a task-specific hybrid evaluator from a plain-language description and 2–5 golden examples, calibrated on the ~10 calibration grades of a ~20-output user-graded sample, with judge–human agreement reported as a first-class metric (H-A).
 2. **A measurement** that selecting a (model, harness) configuration against that evaluator beats always-frontier, a generic-leaderboard pick, and a query-level router on cost at the user's quality bar, across N recurring tasks from M users (H-B).
 3. **An accounting** of the full cost of deciding — construction, calibration, sweep — yielding the break-even repetition count at which a personal benchmark pays for itself, with its sensitivity (H-C).
 
