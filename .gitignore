@@ -42,7 +42,7 @@ crucible/results/*.log
 !crucible/results/qwen35-hermes-fix.jsonl
 
 # per-battery integrity/canary sidecars (transient)
-crucible/results/*.integrity.jsonl
+# crucible/results/*.integrity.jsonl  — NO LONGER ignored (2026-09-17): sandbox-escape evidence must be retained (paper/INVENTORY.md §C.7)
 crucible/results/*.canary.jsonl
 !crucible/results/cloud-b2.jsonl
 !crucible/results/cloud-claude-t1.jsonl
@@ -63,3 +63,18 @@ crucible/results/*.canary.jsonl
 /config/
 /report.txt
 /.roots/
+
+# latex build intermediates (paper/main.tex is the source; main.pdf IS tracked)
+paper/*.aux
+paper/*.bbl
+# ...but main.bbl IS tracked: arXiv requires the .bbl at submission (it does not run BibTeX)
+!paper/main.bbl
+paper/*.blg
+paper/*.out
+paper/*.log
+paper/*.toc
+paper/*.lof
+paper/*.lot
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz

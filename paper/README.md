@@ -1,45 +1,73 @@
-# Crucible — workshop paper
+# Crucible v1 — the paper
 
-`main.tex` + `refs.bib` → `main.pdf` (currently 8 pages incl. references and figures).
-The two figures are auto-generated TikZ (`figs/*.tex`) — regenerate from the frozen ledgers
-with `node figs/make-figs.js` (CI runs `--check`); never edit `figs/*.tex` by hand.
+`main.tex` + `refs.bib` + `figs/*.tex` → `main.pdf`. **Every number in the manuscript is copied from
+a generated file** — `REANALYSIS.md` (tables, contrasts, figures) or `INVENTORY.md` §A (cohort
+census) — and both generators run in CI with `--check` against the frozen ledgers in
+`../crucible/results/`. Do not hand-edit numbers in `main.tex`; re-run the generators.
 
 ## Build
 
 ```bash
-brew install tectonic     # once
+brew install tectonic      # once
 cd paper && tectonic main.tex
 ```
 
-Or upload `main.tex` + `refs.bib` to Overleaf (pdfLaTeX + natbib).
+Or upload `main.tex`, `refs.bib`, and `figs/` to Overleaf (pdfLaTeX + natbib).
 
-## Framing (do not drift from this)
+## Reproduce the analysis (no model runs; ~10 s)
 
-An **empirical measurement study + reusable apparatus** — NOT a definitive-benchmark paper.
-The 515-run battery is labeled an *exploratory pilot* throughout; confirmatory claims are
-deferred to the pre-registered design (§7 of the paper, §5/§5A of
-`../docs/crucible-hypotheses.md`). This honesty is a feature reviewers reward, not a weakness.
+Regenerates every table, figure, and inventory in the paper from the committed run ledgers:
 
-## Submission targets (as of 2026-07-18)
+```bash
+node crucible/tools/inventory.js          # paper/INVENTORY.md §A  (cohort census, codex census, failure table)
+node crucible/tools/reanalysis.js         # paper/REANALYSIS.md + figs/sensitivity.tex + figs/ladder-pass.tex
+node paper/figs/make-figs.js              # figs/codex-bookend.tex + figs/ladder.tex
+node crucible/tools/clustered-stats.js    # rank-stability noise null (τ = 0.41 vs 0.73)
+node crucible/audit-claims.js crucible/results/battery.published.jsonl   # 41 pinned claims
+```
 
-| Venue | Deadline | Fit |
-|---|---|---|
-| NeurIPS 2026 workshops (Sydney Dec 11–12; Paris/Atlanta Dec 12–13) | contributions ~**Aug 29, 2026** | primary target — accepted-workshop shortlist w/ deadlines in `SPRINT.md` §S3.1 (top fits: SLM-Agents, JUDGe, Verify-Agents) |
-| ICLR 2027 main | ~mid-Sept 2026 | needs the confirmatory battery + external anchor first |
-| TMLR | rolling | archival fallback; venue of "AI Agents That Matter" — rewards rigor over scale |
-| ICLR 2027 workshops | ~Feb 2027 | backup if NeurIPS timing slips |
+`--check` on the first three exits non-zero if the committed output differs from what the ledgers
+produce; CI runs all of them (`.github/workflows/crucible.yml`).
 
-Most workshop styles are mandatory at submission: swap the preamble for the workshop's `.sty`
-when the venue is chosen (the body is style-agnostic; only the preamble changes).
+## Repeat an experiment (needs Ollama + a harness; minutes)
 
-## Before submitting — checklist
+One instrumented cell — the weights-fixed contrast in §5.1 of the paper:
 
-- [ ] Rerun `node ../crucible/audit-claims.js` and cross-check every number in §4 of the paper
-      against the frozen ledgers (the paper hand-copies numbers; the CI guard covers the docs,
-      not this tex file).
-- [ ] Confirmatory Phase D (third model family, 5 seeds, hardened T1) — fold results into §4/§7
-      or explicitly mark still-pending.
-- [ ] De-anonymize/anonymize per venue rules (author block is currently non-anonymous).
-- [ ] If the venue wants an artifact link, point to the public repo + `battery.published.jsonl`.
-- [ ] Citations were verified against the arXiv API on 2026-07-18 (all IDs in refs.bib resolve;
-      see provenance note in `../docs/crucible-related-work.md`). Re-verify at camera-ready.
+```bash
+ollama pull qwen3.5:9b
+npm install -g @mariozechner/pi-coding-agent          # the pi harness (see ../LEARNINGS.md §6 for the others)
+CRUCIBLE=1 HARNESS_MODEL=qwen3.5:9b SEED=1 ./loop.sh crucible/tasks/tool-recover pi 6
+# → .runs/<task>.pi/result.json + trace.jsonl; verify.sh exit 0 = delivered
+```
+
+A full cohort is `crucible/matrix.sh` (see `../crucible/README.md`); the ladder, Phase D, and anchor
+cohorts have their own runners (`crucible/phase-d.sh`, `crucible/anchor.sh`). Local cohorts take
+hours and are hardware-conditional; the paper's numbers come from the committed ledgers, not from a
+re-run.
+
+## Provenance
+
+| Document | Role |
+|---|---|
+| `INVENTORY.md` | experiment inventory (§A generated), claim-to-evidence table (§B), discrepancy register (§C) |
+| `REANALYSIS.md` | generated tables and contrasts under both outcome metrics; §6 is the machine-checked headline block |
+| `SPRINT.md` | the publication plan and release checklist |
+| `../docs/crucible-hypotheses.md` | the pre-registration document (frozen sections dated before the runs) |
+| `../docs/crucible-v2-plan.md` | future work (personal benchmarks / allocation) — out of scope for v1 |
+
+Reused third-party material: ten Terminal-Bench tasks (Apache-2.0, upstream commit `d28711d`,
+adapted via `crucible/tools/anchored-build/`); harnesses are installed from their upstream
+distributions and are not redistributed here. This repository is MIT.
+
+## Submission (arXiv)
+
+1. Tag the release: `git tag v1.0-paper && git push --tags` (the paper cites this tag).
+2. arXiv account under the real name and affiliation; category **cs.SE** primary, cross-list **cs.AI**;
+   endorsement per arXiv's instructions if requested.
+3. Upload the LaTeX source package: `main.tex`, `refs.bib`, `main.bbl`, `figs/*.tex` (a
+   PDF-only upload is not appropriate for LaTeX-generated papers).
+4. Check arXiv's compiled PDF, metadata, and links; leave journal-reference empty.
+5. After announcement, add the arXiv ID to `CITATION.cff` and the root README.
+
+Before pressing Submit, run the release checklist in `SPRINT.md` and make sure the independent
+check in `REVIEW-REQUEST.md` has been done.

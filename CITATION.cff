@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use Crucible, its frozen run ledgers, or its analysis, please cite the paper below."
+title: "Crucible: An Empirical Study of Harness–Model Compatibility and Delivery in Local Coding Agents"
+type: software
+authors:
+  - family-names: Goswami
+    given-names: Siddhant
+    affiliation: "100x Engineers, Bengaluru, India"
+    email: content@100xengineers.com
+repository-code: "https://github.com/Siddhant-Goswami/Crucible"
+license: MIT
+version: v1.0-paper
+date-released: 2026-09-17
+keywords:
+  - coding agents
+  - agent harness
+  - evaluation
+  - local models
+  - reproducibility
+preferred-citation:
+  type: article
+  title: "Crucible: An Empirical Study of Harness–Model Compatibility and Delivery in Local Coding Agents"
+  authors:
+    - family-names: Goswami
+      given-names: Siddhant
+  year: 2026
+  journal: "arXiv preprint"
+  notes: "arXiv identifier to be added on announcement; see paper/README.md."

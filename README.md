@@ -64,8 +64,16 @@ arms with real token accounting. Start with the plain-English
 synthesis of the 2026 harness literature in
 [docs/harness-first-principles.md](./docs/harness-first-principles.md).
 
-**Workshop paper:** [`paper/`](./paper/) holds the LaTeX draft (`tectonic main.tex` → 7pp PDF),
-verified bibliography, and submission checklist. The pre-registered **Phase D confirmatory arm**
+**Paper (v1, arXiv):** [`paper/`](./paper/) holds the manuscript *Crucible: An Empirical Study of
+Harness–Model Compatibility and Delivery in Local Coding Agents* (`tectonic main.tex`), the
+experiment inventory and claim-to-evidence table ([`INVENTORY.md`](./paper/INVENTORY.md)), and the
+reanalysis every number is copied from ([`REANALYSIS.md`](./paper/REANALYSIS.md)). **The paper's
+primary outcome is *delivery* (verifier pass within deadline over attempted cells), and it scopes
+several of the headline sentences above more narrowly** — in particular it withdraws the cross-size
+"pi@2b beats the control at 9b" comparison (n.s. as a paired contrast), reports the cloud codex arm
+as a demonstration on an account-default model, and shows which contrasts are significant under
+one metric only. Where this README and the paper differ, the paper's wording is the one to cite;
+the Goodput numbers above remain exact for the frozen ledgers and are guarded by `audit-claims.js`. The pre-registered **Phase D confirmatory arm**
 (3rd model family `llama3.2:3b` × 5 seeds × 11 tasks incl. the hardened T1 trio) runs via
 [`crucible/phase-d.sh`](./crucible/phase-d.sh) (`calibrate` → `start`/`status`/`stop`; detached
 + resumable).
